@@ -1,0 +1,36 @@
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+
+# Archivos compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ENTORNOS Y CONFIGURACIÓN
+
+.env
+.env.local
+*.env
+instance/
+.webassets-cache
+
+
+# IDEs Y EDITORES
+# VSCode
+.vscode/
+*.code-workspace
+
+
+# LOGS 
+*.log
+
+# ARCHIVOS TEMPORALES
+*.tmp
+*.bak
+*.swp
+*~
