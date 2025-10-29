@@ -5,4 +5,11 @@ Simplex Solver es una aplicación académica desarrollada en el marco de la mate
 - [@ItsCaaam](https://www.github.com/itscaaam) Barrera Camila
 - [@ivanjcs](https://www.github.com/ivanjcs) Castro Ivan
 - [@solparejas](https://www.github.com/solparejas) Parejas Sol
-- [@Rocio-Caro-Caceres](https://www.github.com/Rocio-Caro-Caceres) Rocio Caceres
+- [@Rocio-Caro-Caceres](https://www.github.com/Rocio-Caro-Caceres) Rocio Caro Caceres
+
+## Instalación
+1. Clona el repositorio: `git clone <repo-url>`
+2. Crea un virtualenv: `python -m venv venv; source venv/bin/activate` (o en Windows: `venv\Scripts\activate`)
+3. Instala dependencias: `pip install -r requirements.txt` (incluye pytest para tests)
+4. Ejecuta: `python app.py`
+5. Para tests: `pytest`
