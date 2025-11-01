@@ -70,9 +70,6 @@ class ConstraintsParser:
 
         # 3. Parsear Lado Izquierdo (Coeficientes)
         coefficients = ConstraintsParser._parse_left_side(left_side)
-        
-        # 4. Validar consistencia de variables
-        ConstraintsValidator.validate_consecutive_variables(coefficients)
 
         return Constraint(coefficients, operator, rhs_value)
 
@@ -99,7 +96,7 @@ class ConstraintsParser:
         
         # Verificar que el regex cubrió toda la expresión
         if original_terms != left_side.replace("*", ""):
-             raise ValueError("Formato inválido. Contiene términos no reconocidos.")
+                 raise ValueError("Formato inválido. Contiene términos no reconocidos.")
 
         for coef_str, var_index in matches:
             var_name = f"x{var_index}"
