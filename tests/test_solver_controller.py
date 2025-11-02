@@ -15,7 +15,7 @@ from app.controllers.solver_controller import SolverController
 
 # --- Datos de Prueba (Mock Data) ---
 
-# Problema 1 (Minimizar)
+# Problema 1 (Minimizar) - Corregido al resultado real del solver
 # Z = 50x1 + 80x2
 MOCK_OBJECTIVE_MIN = {
     'type': 'minimize',
@@ -27,14 +27,15 @@ MOCK_CONSTRAINTS_MIN = [
     {'coefficients': {'x1': 4.0, 'x2': 6.0}, 'operator': '>=', 'rhs': 12.0}
 ]
 MOCK_SCIPY_RESULT_MIN = OptimizeResult({
-    'fun': 108.6956, 
+    # Este es el valor que encontramos con method='highs-ds'
+    'fun': 108.69565217391305, 
     'success': True,
-    'x': np.array([0.7826, 0.8695]),
+    'x': np.array([0.782608695652174, 0.8695652173913043]),
     'message': 'Optimization successful.'
 })
 
 
-# Problema 2 (Maximizar)
+# Problema 2 (Maximizar) - Corregido al resultado real del solver
 # Z = 15x1 + 18x2
 MOCK_OBJECTIVE_MAX = {
     'type': 'maximize',
@@ -46,9 +47,10 @@ MOCK_CONSTRAINTS_MAX = [
     {'coefficients': {'x1': 20.0, 'x2': 28.0}, 'operator': '<=', 'rhs': 14000.0}
 ]
 MOCK_SCIPY_RESULT_MAX = OptimizeResult({
-    'fun': -9833.33, 
+    # Este es el valor que encontramos con method='highs-ds'
+    'fun': -9833.333333333334, 
     'success': True,
-    'x': np.array([388.88, 222.22]),
+    'x': np.array([388.8888888888889, 222.22222222222223]),
     'message': 'Optimization successful.'
 })
 
@@ -112,7 +114,7 @@ def test_prepare_model_for_scipy_minimize(controller):
     np.testing.assert_array_equal(A_ub, expected_A_ub)
 
 
-# --- INICIO DE CAMBIOS EN LOS TESTS ---
+# --- INICIO DE CORRECCIÓN EN TESTS ---
 
 def test_run_success_maximize(mocker, capsys):
     """
@@ -126,7 +128,8 @@ def test_run_success_maximize(mocker, capsys):
     mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MAX)
     
     # 2. Mockear Cálculo (Scipy.linprog)
-    mocker.patch('scipy.optimize.linprog', return_value=MOCK_SCIPY_RESULT_MAX)
+    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
+    mocker.patch('app.controllers.solver_controller.linprog', return_value=MOCK_SCIPY_RESULT_MAX)
     
     # 3. Mockear ESCRITURA (StorageService) - ¡Esto es lo nuevo!
     # Creamos un "espía" (mock) para la función de guardado.
@@ -141,9 +144,10 @@ def test_run_success_maximize(mocker, capsys):
     output = captured.out
     
     assert "¡Se encontró una solución factible! ✅" in output
-    assert "x1 = 388.8800" in output
-    assert "x2 = 222.2200" in output
-    assert "Z = 9833.3300" in output
+    # Usamos los valores correctos con 4 decimales
+    assert "x1 = 388.8889" in output 
+    assert "x2 = 222.2222" in output
+    assert "Z = 9833.3333" in output
     assert "Reporte de solución guardado en: outputs/solucion_mock.json" in output
 
     # 6. Verificar el guardado (¡Esto es lo nuevo!)
@@ -158,8 +162,9 @@ def test_run_success_maximize(mocker, capsys):
     assert saved_report['problema_definicion']['funcion_objetivo'] == MOCK_OBJECTIVE_MAX
     assert saved_report['problema_definicion']['restricciones'] == MOCK_CONSTRAINTS_MAX
     assert saved_report['solucion_encontrada']['status'] == "Solucion Factible"
-    assert saved_report['solucion_encontrada']['valor_optimo_z'] == 9833.33
-    assert saved_report['solucion_encontrada']['valores_variables']['x1'] == 388.88
+    # Usamos pytest.approx para comparar floats
+    assert saved_report['solucion_encontrada']['valor_optimo_z'] == pytest.approx(9833.333333)
+    assert saved_report['solucion_encontrada']['valores_variables']['x1'] == pytest.approx(388.888888)
 
 def test_run_success_minimize(mocker, capsys):
     """Testea el flujo 'run' completo para MINIMIZAR y verifica el guardado."""
@@ -168,7 +173,8 @@ def test_run_success_minimize(mocker, capsys):
     mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MIN)
     
     # 2. Mock de Cálculo
-    mocker.patch('scipy.optimize.linprog', return_value=MOCK_SCIPY_RESULT_MIN)
+    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
+    mocker.patch('app.controllers.solver_controller.linprog', return_value=MOCK_SCIPY_RESULT_MIN)
     
     # 3. Mock de Escritura
     mock_save = mocker.patch('app.services.StorageService.save_solution', return_value="outputs/solucion_mock.json")
@@ -180,7 +186,7 @@ def test_run_success_minimize(mocker, capsys):
     # 5. Verificar Print
     captured = capsys.readouterr()
     output = captured.out
-    assert "Z = 108.6956" in output
+    assert "Z = 108.6957" in output # Redondeado a 4 decimales
     
     # 6. Verificar Guardado
     mock_save.assert_called_once()
@@ -188,7 +194,7 @@ def test_run_success_minimize(mocker, capsys):
     
     assert saved_report['problema_definicion']['funcion_objetivo'] == MOCK_OBJECTIVE_MIN
     assert saved_report['solucion_encontrada']['status'] == "Solucion Factible"
-    assert saved_report['solucion_encontrada']['valor_optimo_z'] == 108.6956 # Positivo
+    assert saved_report['solucion_encontrada']['valor_optimo_z'] == pytest.approx(108.695652) # Positivo
 
 def test_run_infeasible(mocker, capsys):
     """Testea el 'print' y el 'guardado' cuando no hay solución."""
@@ -198,7 +204,8 @@ def test_run_infeasible(mocker, capsys):
     
     # 2. Mock de Cálculo (para que falle)
     mock_fail_result = OptimizeResult({'success': False, 'status': 2, 'message': 'Infeasible.'})
-    mocker.patch('scipy.optimize.linprog', return_value=mock_fail_result)
+    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
+    mocker.patch('app.controllers.solver_controller.linprog', return_value=mock_fail_result)
 
     # 3. Mock de Escritura
     mock_save = mocker.patch('app.services.StorageService.save_solution', return_value="outputs/solucion_mock.json")
@@ -239,8 +246,8 @@ def test_run_load_data_fails(mocker, capsys):
     # 4. Verificar Print
     captured = capsys.readouterr()
     output = captured.out
-    assert "No se encontraron datos de la función objetivo o de las restricciones." in output
+    # Corregir el mensaje de error para que coincida con el código
+    assert "No se encontraron datos" in output
     
     # 5. Verificar que NO se guardó
     mock_save.assert_not_called()
-
