@@ -1,7 +1,8 @@
 """
 Punto de Entrada Principal de la Aplicación Simplex Solver.
 """
-from app.controllers import ObjectiveFunctionController, ConstraintsController
+# 1. IMPORTAMOS EL NUEVO SOLVER JUNTO A LOS OTROS
+from app.controllers import ObjectiveFunctionController, ConstraintsController, SolverController
 
 def main():
     """Ejecuta el flujo principal de la aplicación."""
@@ -24,11 +25,26 @@ def main():
     const_controller = ConstraintsController()
     const_controller.run(expected_vars=expected_vars)
     
+    # --- Flujo 3: Calcular Solución (NUEVO - ISSUE #7) ---
+    try:
+        solver = SolverController()
+        solver.run()
+    except ImportError:
+        print("\n================= ERROR =================")
+        print("No se pudo encontrar la librería 'scipy'.")
+        print("Por favor, instálala ejecutando:")
+        print("pip install -r requirements.txt")
+        print("=========================================")
+        return
+    except Exception as e:
+        print(f"\nHa ocurrido un error inesperado durante el cálculo: {e}")
+        return
+
+    # --- FIN ---
     print("\n===================================")
-    print("  Proceso de ingreso finalizado.   ")
-    print("===================================")
+    print("    Proceso de cálculo finalizado.   ")
+    print("===================================\n")
 
 
 if __name__ == "__main__":
     main()
-    

@@ -25,18 +25,20 @@ def test_parse_valid_expressions(expression, expected_coefs, operator, rhs):
 @pytest.mark.parametrize("expression, error_message", [
     ("", "no puede estar vacía"),
     ("   ", "no puede estar vacía"),
-    ("2x1 + 3x2 < 10", "operador válido"),  # Este podría fallar si "<" se detecta mal; prueba y ajusta si necesario
+    ("2x1 + 3x2 < 10", "operador válido"),
     ("2x1 + 3x2 >> 10", "operador válido"),
-    ("2x1 + 3x2 =< 10", "número válido"),  # Cambiado: Coincide con RHS error ("<10")
-    ("2x1 + 3x2 <= 10 >= 5", "número válido"),  # Cambiado: Coincide con RHS error ("10>=5")
+    ("2x1 + 3x2 =< 10", "número válido"),
+    ("2x1 + 3x2 <= 10 >= 5", "número válido"),
     ("2x1 + 3x2", "Formato inválido"),
-    ("<= 10", "lado izquierdo de la restricción está vacío"),  # Cambiado: Agrega "de la restricción" (sin punto, ya que re.search match parcial)
-    ("2x1 + 3x2 <=", "número válido"),  # Cambiado: Coincide con RHS error ('')
-    ("2x1 + 3x2 <= Diez", "número válido"),  # Cambiado: Coincide con RHS error ('Diez')
+    ("<= 10", "lado izquierdo de la restricción está vacío"),
+    ("2x1 + 3x2 <=", "número válido"),
+    ("2x1 + 3x2 <= Diez", "número válido"),
     ("2a + 3b <= 10", "Formato inválido en el lado izquierdo"),
     ("2x1 + 3x1 <= 10", "Variable duplicada: x1"),
-    ("2x1 + 3x3 <= 10", "Falta la variable x2"),
-    ("2x2 + 3x3 <= 10", "debe comenzar en x1"),
+    # --- INICIO DE CORRECCIÓN ---
+    # ("2x1 + 3x3 <= 10", "Falta la variable x2"),      <-- ESTA LÍNEA SE QUITA (Bug #2 Arreglado)
+    # ("2x2 + 3x3 <= 10", "debe comenzar en x1"),   <-- ESTA LÍNEA SE QUITA (Bug #2 Arreglado)
+    # --- FIN DE CORRECCIÓN ---
     ("2x1 + 3x2 + 5 <= 10", "términos no reconocidos"),
 ])
 def test_parse_invalid_expressions(expression, error_message):
@@ -65,7 +67,7 @@ def test_validator_set_consistency_valid():
 def test_validator_set_consistency_invalid():
     # Simulamos un caso donde post-fill aún difieren (e.g., si fill no se hace o falla lógicamente)
     c1 = Constraint(coefficients={"x1": 1.0, "x2": 1.0}, operator="<=", rhs=10)
-    c2 = Constraint(coefficients={"x1": 1.0, "x3": 1.0}, operator=">=", rhs=5)  # Difiere incluso si fill, pero asumimos no fill para testear raw
+    c2 = Constraint(coefficients={"x1": 1.0, "x3": 1.0}, operator=">=", rhs=5)    # Difiere incluso si fill, pero asumimos no fill para testear raw
     with pytest.raises(ValueError, match="Inconsistencia de variables"):
         ConstraintsValidator.validate_set_consistency([c1, c2])
 
@@ -82,8 +84,8 @@ def test_constraint_serialization():
 
 # Edge cases adicionales para parsing
 @pytest.mark.parametrize("expression, expected_coefs, operator, rhs", [
-    ("2x1 + .5x2 = 0", {"x1": 2.0, "x2": 0.5}, "=", 0.0),  # Decimal implícito y RHS=0
-    ("-0.0x1 <= 0", {"x1": -0.0}, "<=", 0.0),  # Coef 0.0 implícito
+    ("2x1 + .5x2 = 0", {"x1": 2.0, "x2": 0.5}, "=", 0.0),   # Decimal implícito y RHS=0
+    ("-0.0x1 <= 0", {"x1": -0.0}, "<=", 0.0),    # Coef 0.0 implícito
 ])
 def test_parse_edge_cases(expression, expected_coefs, operator, rhs):
     constraint = ConstraintsParser.parse(expression)
@@ -93,4 +95,4 @@ def test_parse_edge_cases(expression, expected_coefs, operator, rhs):
 
 # Test para sets vacíos en validator
 def test_validator_set_consistency_empty():
-    assert ConstraintsValidator.validate_set_consistency([]) == True  # Vacío OK
+    assert ConstraintsValidator.validate_set_consistency([]) == True    # Vacío OK
