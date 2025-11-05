@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cargar Problema - Simplex Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Simplex Solver</h1>
+        <p class="subtitle">Cargar un problema existente</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="messages">
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data" class="form-load">
+            <label for="problem_file">Seleccionar archivo (.txt o .json):</label>
+            <input type="file" id="problem_file" name="problem_file" accept=".txt,.json" required>
+
+            <button type="submit" class="btn-submit">Cargar Archivo</button>
+        </form>
+
+        <div class="button-container">
+            <a href="{{ url_for('ui.index') }}" class="btn-secondary">Volver</a>
+        </div>
+    </div>
+</body>
+</html>

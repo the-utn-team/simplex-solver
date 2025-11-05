@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Simplex Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Simplex Solver</h1>
+        <p class="subtitle">Selecciona una opción para comenzar</p>
+
+        <div class="buttons-container">
+            <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">Nuevo problema</a>
+            <a href="{{ url_for('ui.load_problem') }}" class="btn-secondary">Cargar problema</a>
+        </div>
+    </div>
+</body>
+</html>

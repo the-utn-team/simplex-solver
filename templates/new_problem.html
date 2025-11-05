@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Nuevo Problema - Simplex Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Simplex Solver</h1>
+        <p class="subtitle">Ingresa tu problema de programación lineal</p>
+
+        <form method="POST" action="{{ url_for('ui.new_problem') }}">
+            
+            <!-- Tipo de problema -->
+            <section class="problem-type">
+                <h3>Tipo de problema</h3>
+                <label><input type="radio" name="problem_type" value="maximize" checked> Maximizar</label>
+                <label><input type="radio" name="problem_type" value="minimize"> Minimizar</label>
+            </section>
+
+            <!-- Función objetivo -->
+            <div class="section">
+                <h3>Coeficientes de la función objetivo</h3>
+                <div id="objective-terms" class="terms-container"></div>
+                <button type="button" id="add-term" class="btn-secondary">Añadir coeficiente</button> 
+            </div>
+
+            <script>
+                let termCount = 0;
+
+                document.getElementById("add-term").addEventListener("click", () => {
+                    termCount++;
+                    const termDiv = document.createElement("div");
+                    termDiv.classList.add("term-row");
+
+                    termDiv.innerHTML = `
+                        <input type="number" class="coef-input" name="objective[]" placeholder="Coef" required>
+                        <span class="variable-label">x${termCount}</span>
+                        <button type="button" class="btn-delete" title="Eliminar término">🗑️</button>
+                    `;
+
+                    termDiv.querySelector(".btn-delete").addEventListener("click", () => {
+                        termDiv.remove();
+                        updateVariableLabels();
+                    });
+
+                    document.getElementById("objective-terms").appendChild(termDiv);
+                    updateVariableLabels();
+                    updateConstraintInputs();
+                });
+
+                function updateVariableLabels() {
+                    const rows = document.querySelectorAll(".term-row");
+                    termCount = rows.length;
+                    rows.forEach((row, index) => {
+                        row.querySelector(".variable-label").textContent = `x${index + 1}`;
+                    });
+                }
+
+                function updateConstraintInputs() {
+                    // Ajusta las restricciones existentes cuando cambia el número de coeficientes
+                    const constraints = document.querySelectorAll(".constraint");
+                    constraints.forEach(constraint => {
+                        const inputs = constraint.querySelectorAll(".constraint-coef");
+                        const diff = termCount - inputs.length;
+
+                        if (diff > 0) {
+                            // Agregar inputs faltantes
+                            for (let i = inputs.length + 1; i <= termCount; i++) {
+                                const input = document.createElement("input");
+                                input.type = "number";
+                                input.classList.add("constraint-coef");
+                                input.name = `constraint_${i}[]`;
+                                input.placeholder = `a${i}`;
+                                input.step = "any";
+                                constraint.insertBefore(input, constraint.querySelector("select"));
+                            }
+                        } else if (diff < 0) {
+                            // Eliminar inputs sobrantes
+                            for (let i = 0; i < Math.abs(diff); i++) {
+                                constraint.querySelectorAll(".constraint-coef")[inputs.length - 1 - i].remove();
+                            }
+                        }
+                    });
+                }
+            </script>
+
+            <!-- Restricciones -->
+            <section class="constraints-section">
+                <h3>Restricciones</h3>
+                <div id="constraints-container" class="constraints-container"></div>
+                <button type="button" id="add-constraint" class="btn-secondary">Añadir restricción</button>
+            </section>
+
+            <div id="problem-preview" class="preview-box hidden">
+                <h3>Vista previa del problema:</h3>
+                <pre id="preview-text"></pre>
+            </div>
+            <button type="button" id="preview-problem" class="btn-secondary">Generar vista previa</button>
+            
+            <button type="submit" class="btn-submit">Cargar Problema</button>
+
+        </form>
+    </div>
+
+    <script>
+        // Añadir una nueva restricción
+        document.getElementById("add-constraint").addEventListener("click", function() {
+            const container = document.getElementById("constraints-container");
+            const div = document.createElement("div");
+            div.className = "constraint";
+
+            // Crear coeficientes según la cantidad actual de variables (termCount)
+            let coefInputs = "";
+            for (let i = 1; i <= termCount; i++) {
+                coefInputs += `<input type="number" class="constraint-coef" name="constraint_${i}[]" placeholder="a${i}" step="any"> `;
+            }
+
+            div.innerHTML = `
+                ${coefInputs}
+                <select name="constraint_sign[]">
+                    <option value="<=">&le;</option>
+                    <option value="=">=</option>
+                    <option value=">=">&ge;</option>
+                </select>
+                <input type="number" name="constraint_rhs[]" placeholder="b" step="any">
+                <button type="button" class="delete-btn" onclick="removeConstraint(this)">🗑</button>
+            `;
+            container.appendChild(div);
+        });
+
+        function removeConstraint(btn) {
+            btn.parentElement.remove();
+        }
+    </script>
+
+    <script>
+        document.getElementById("preview-problem").addEventListener("click", showPreview);
+
+        function showPreview() {
+            const type = document.querySelector('input[name="problem_type"]:checked')?.value || "maximize";
+            const coefInputs = document.querySelectorAll('#objective-terms input[type="number"]');
+            const constraints = document.querySelectorAll('.constraint');
+
+            // Construir función objetivo
+            let text = `${type === "maximize" ? "Maximizar" : "Minimizar"}:\nZ = `;
+            text += Array.from(coefInputs)
+                .map((input, i) => `${input.value || 0}x${i + 1}`)
+                .join(" + ");
+            text += `\nSujeto a:\n`;
+
+            // Construir restricciones
+            constraints.forEach((constraint) => {
+                const coefInputs = constraint.querySelectorAll('input[type="number"]:not([name*="rhs"])');
+                const sign = constraint.querySelector('select')?.value || "<=";
+                const rhs = constraint.querySelector('input[name*="rhs"]')?.value || 0;
+
+                const expr = Array.from(coefInputs)
+                    .map((input, i) => `${input.value || 0}x${i + 1}`)
+                    .join(" + ");
+
+                text += `${expr} ${sign} ${rhs}\n`;
+            });
+
+            // Condición de no negatividad
+            const nonNeg = Array.from(coefInputs)
+                .map((_, i) => `x${i + 1} ≥ 0`)
+                .join(", ");
+            text += `${nonNeg}`;
+
+            // Mostrar vista previa
+            document.getElementById("preview-text").textContent = text;
+            document.getElementById("problem-preview").classList.remove("hidden");
+        }
+    </script>
+
+</body>
+</html>
