@@ -3,10 +3,11 @@ Controlador para la interfaz gráfica.
 Define un conjunto de rutas relacionadas con la interfaz del usuario.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash, json, jsonify
 import os
 
 ui_bp = Blueprint('ui', __name__)
+
 
 @ui_bp.route('/')
 def index():
@@ -16,31 +17,58 @@ def index():
     """
     return render_template('index.html')
 
-@ui_bp.route('/new')
+
+@ui_bp.route('/new', methods=['GET', 'POST'])
 def new_problem():
     """
     Vista para crear un nuevo problema de programación lineal.
-    Permite ingresar los coeficientes de la función objetivo y restricciones.
+    Convierte los datos del formulario en el formato JSON esperado por el solver.
     """
-    if request.method == "POST":
-        objective = request.form.get("objective")
-        constraints = request.form.get("constraints")
-        problem_type = request.form.get("problem_type")
+    if request.method == 'POST':
+        problem_type = request.form.get('problem_type', 'maximize')
+        objective_list = request.form.getlist('objective[]')
+        constraint_signs = request.form.getlist('constraint_sign[]')
+        constraint_rhs = request.form.getlist('constraint_rhs[]')
 
-        # Validación simple
-        if not objective or not constraints:
-            flash("Por favor completa todos los campos.", "error")
-            return redirect(url_for("ui.new_problem"))
+        # Cantidad de variables = cantidad de coeficientes de la función objetivo
+        num_vars = len(objective_list)
+        num_constraints = len(constraint_signs)
 
-        # Simulación: guardar datos (más adelante se integrará con el solver)
-        print("Tipo de problema:", problem_type)
-        print("Función objetivo:", objective)
-        print("Restricciones:", constraints)
+        # Crear diccionario de la función objetivo
+        objective = {
+            "type": problem_type,
+            "coefficients": {f"x{i+1}": float(objective_list[i]) for i in range(num_vars)}
+        }
 
-        flash("Problema creado correctamente.", "success")
-        return redirect(url_for("ui.index"))
+        # Crear lista de restricciones
+        restricciones = []
+        for i in range(num_constraints):
+            coefs = {}
+            for j in range(num_vars):
+                val = request.form.getlist(f'constraint_{j+1}[]')[i]
+                coefs[f"x{j+1}"] = float(val) if val else 0.0
+            restricciones.append({
+                "coefficients": coefs,
+                "operator": constraint_signs[i],
+                "rhs": float(constraint_rhs[i]) if constraint_rhs[i] else 0.0
+            })
+
+        # Estructura completa del problema
+        problema = {
+            "funcion_objetivo": objective,
+            "restricciones": restricciones
+        }
+
+        # (Temporal) Mostrar en consola para verificar
+        import json
+        print(json.dumps(problema, indent=4, ensure_ascii=False))
+
+        # TODO: aquí se podría guardar o enviar al solver
+        flash("Problema cargado correctamente.", "success")
+        return render_template("preview.html", problem_data=problema)
 
     return render_template("new_problem.html")
+
 
 @ui_bp.route('/load')
 def load_problem():
@@ -63,3 +91,44 @@ def load_problem():
         return redirect(url_for("ui.index"))
 
     return render_template("load_problem.html")
+
+
+@ui_bp.route('/preview', methods=['POST'])
+def preview():
+    """
+    Muestra la vista previa del problema antes de resolverlo.
+    """
+
+    # Simula recepción del problema desde el formulario o JSON
+    problem_data = json.loads(request.form.get("problem_data"))
+
+    return render_template("preview.html", problem_data=problem_data)
+
+
+@ui_bp.route('/procesar_formulario', methods=['POST'])
+def procesar_formulario():
+    data = request.get_json()  # si el formulario se envía como JSON
+    print("Datos recibidos:", data)
+    return jsonify({"status": "ok", "data_recibida": data}), 200
+
+
+@ui_bp.route('/solve', methods=['POST'])
+def solve_problem():
+    """
+    Procesa el problema recibido desde la vista previa y ejecuta el solver (simulado por ahora).
+    """
+    import json
+
+    # Obtener datos enviados
+    data_raw = request.form.get("problem_data")
+    if not data_raw:
+        return "<p>Error: No se recibieron datos del problema.</p>", 400
+
+    problem_data = json.loads(data_raw)
+
+    # Por ahora, solo mostramos por consola
+    print("Problema recibido para resolver:")
+    print(json.dumps(problem_data, indent=4))
+
+    flash("Problema enviado correctamente al solver (simulado).", "success")
+    return redirect(url_for("ui.index"))

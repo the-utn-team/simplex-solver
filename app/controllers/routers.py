@@ -16,9 +16,10 @@ def init_app():
         static_folder=os.path.join(base_dir, "static")
     )
 
+    # Registro de blueprints
     app.register_blueprint(ui_bp)
 
-    #Soporte para mensajes flash
+    # Soporte para mensajes flash
     app.secret_key = "simplex_Secret_key"
 
     return app
