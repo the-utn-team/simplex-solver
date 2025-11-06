@@ -67,9 +67,34 @@ button {
     margin-top: 10px;
 }
 
+/*
 .btn-primary {
     background-color: #000;
     color: white;
+}*/
+
+/* Estado normal del botón Calcular */
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+/* Al pasar el mouse (solo si está habilitado) */
+.btn-primary:hover:enabled {
+  background-color: #0056b3;
+}
+
+/* Estado deshabilitado */
+.btn-primary:disabled {
+  background-color: #c0c0c0;  /* gris */
+  color: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.8;
 }
 
 .btn-secondary {
@@ -120,4 +145,30 @@ button {
     flex-direction: column;
     align-items: center;
     margin-top: 20px;
+}
+
+.flash-messages { margin-bottom: 1rem; }
+.flash { padding: 10px; border-radius: 5px; margin: 5px 0; }
+.flash.success { background-color: #d1ffd1; border: 1px solid #4CAF50; }
+.flash.error { background-color: #ffe0e0; border: 1px solid #e53935; }
+
+input:invalid {
+    border: 2px solid #e53935;
+    background-color: #ffeaea;
+}
+
+.input-error {
+  border: 2px solid #e74c3c !important;
+  background-color: #ffecec;
+}
+
+.error-message {
+  color: #e74c3c;
+  font-size: 0.85em;
+  margin-top: 4px;
+}
+
+input:valid {
+    border: 2px solid #27ae60;
+    background-color: #ecf9f1;
 }
