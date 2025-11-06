@@ -12,30 +12,56 @@
 
         <div class="preview-box">
             <h3>Función objetivo</h3>
-            <pre class="preview-text">
-{{ problem_data['funcion_objetivo']['type'] | capitalize }}:
-Z = 
-{% for var, coef in problem_data['funcion_objetivo']['coefficients'].items() -%}
-{{ coef }}{{ var }}{% if not loop.last %} + {% endif %}
-{% endfor %}
-            </pre>
+            <div class="preview-text">
+                {{ problem_data['funcion_objetivo']['type'] | capitalize }}:
+                Z =
+                {% for var, coef in problem_data['funcion_objetivo']['coefficients'].items() %}
+                    {% set coef_rounded = coef|round(2) %}
+                    {% if loop.first %}
+                        {% if coef_rounded >= 0 %}
+                            {{ coef_rounded }}{{ var }}
+                        {% else %}
+                            -{{ (-coef_rounded) }}{{ var }}
+                        {% endif %}
+                    {% else %}
+                        {% if coef_rounded >= 0 %}
+                            + {{ coef_rounded }}{{ var }}
+                        {% else %}
+                            - {{ (-coef_rounded) }}{{ var }}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+            </div>
 
             <h3>Restricciones</h3>
-            <pre class="preview-text">
-{% for restriccion in problem_data['restricciones'] %}
-{% for var, coef in restriccion['coefficients'].items() -%}
-{{ coef }}{{ var }}{% if not loop.last %} + {% endif %}
-{% endfor %}
- {{ restriccion['operator'] }} {{ restriccion['rhs'] }}
-{% endfor %}
-            </pre>
+            <div class="preview-text">
+                {% for restriccion in problem_data['restricciones'] %}
+                    {% for var, coef in restriccion['coefficients'].items() %}
+                        {% set coef_rounded = coef|round(2) %}
+                        {% if loop.first %}
+                            {% if coef_rounded >= 0 %}
+                                {{ coef_rounded }}{{ var }}
+                            {% else %}
+                                -{{ (-coef_rounded) }}{{ var }}
+                            {% endif %}
+                        {% else %}
+                            {% if coef_rounded >= 0 %}
+                                + {{ coef_rounded }}{{ var }}
+                            {% else %}
+                                - {{ (-coef_rounded) }}{{ var }}
+                            {% endif %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ restriccion['operator'] }} {{ restriccion['rhs'] }}<br>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="button-group">
-            <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Volver</a>
             <form action="{{ url_for('ui.solve_problem') }}" method="POST" style="display:inline;">
                 <button type="submit" class="btn-submit">Resolver Problema</button>
             </form>
+            <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Volver</a>
         </div>
     </div>
 </body>

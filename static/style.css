@@ -55,8 +55,11 @@ button {
 }
 
 .button-container {
+    display: flex;
+    justify-content: center; 
+    gap: 10px; 
+    margin-top: 20px; 
     text-align: center;
-    margin-top: 10px;
 }
 
 .btn-primary, .btn-secondary, .btn-submit {
@@ -97,22 +100,38 @@ button {
   opacity: 0.8;
 }
 
-.btn-secondary {
-    background-color: #e0e0e0;
-    width: 60%;
-    display: inline-block;
-    text-align: center;
-    margin-top: 5px;
-}
-
+/* Botón principal (resolver problema) */
 .btn-submit {
     background-color: #0052cc;
     color: white;
-    width: 100%;
+    width: 60%;
     font-size: 16px;
     margin-top: 20px;
     margin-bottom: 15px;
-    width: 60%;
+    padding: 10px 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.btn-secondary {
+    background-color: #f0f0f0; 
+    color: #333;
+    width: 40%;
+    font-size: 14px; 
+    margin-top: 10px;
+    padding: 8px 0;
+    border: none;
+    border-radius: 5px;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
+    transition: background-color 0.3s;
+}
+
+.btn-secondary:hover {
+    background-color: #dcdcdc; 
 }
 
 .delete-btn {
@@ -171,4 +190,15 @@ input:invalid {
 input:valid {
     border: 2px solid #27ae60;
     background-color: #ecf9f1;
+}
+
+.preview-text {
+    font-family: "Cambria Math", Cambria, "Times New Roman", serif; /* fuente más bonita para fórmulas */
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 8px;
+    white-space: normal; /* permite que las fórmulas fluyan en una sola línea */
+    word-wrap: break-word; /* evita que se desborde si son muy largas */
+    margin-bottom: 15px; /* espacio entre elementos */
+    font-size: 16px; /* opcional: tamaño más cómodo de leer */
 }

@@ -63,7 +63,7 @@ def new_problem():
         # Guardar el problema para usarlo luego en el solver
         storage.save_problem({"problema_definicion": problem_data})
 
-        flash("Problema cargado correctamente.", "success")
+        #flash("Problema cargado correctamente.", "success")
         return render_template("preview.html", problem_data=problem_data)
 
     return render_template("new_problem.html")

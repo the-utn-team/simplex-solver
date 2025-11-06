@@ -11,23 +11,23 @@
 
         {% if solucion %}
             <h3>Estado:</h3>
-            <p>{{ solucion['solucion_encontrada']['status'] }}</p>
+            <p class="preview-text">{{ solucion['solucion_encontrada']['status'] }}</p>
 
             {% if solucion['solucion_encontrada']['valores_variables'] %}
             <h3>Variables:</h3>
-            <ul>
+            <div class="preview-text">
                 {% for var, val in solucion['solucion_encontrada']['valores_variables'].items() %}
-                <li>{{ var }} = {{ "%.4f"|format(val) }}</li>
+                    {{ var }} = {{ "%.4f"|format(val) }}{% if not loop.last %}, {% endif %}
                 {% endfor %}
-            </ul>
+            </div>
 
             <h3>Valor Óptimo (Z):</h3>
-            <p>{{ "%.4f"|format(solucion['solucion_encontrada']['valor_optimo_z']) }}</p>
+            <p class="preview-text">{{ "%.4f"|format(solucion['solucion_encontrada']['valor_optimo_z']) }}</p>
             {% else %}
-            <p>No se encontró una solución factible.</p>
+            <p class="preview-text">No se encontró una solución factible.</p>
             {% endif %}
         {% else %}
-            <p>Error: No hay datos de solución disponibles.</p>
+            <p class="preview-text">Error: No hay datos de solución disponibles.</p>
         {% endif %}
 
         <div class="button-group">
