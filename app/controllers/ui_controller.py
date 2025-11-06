@@ -36,7 +36,6 @@ def new_problem():
         num_vars = len(objective_list)
         num_constraints = len(constraint_signs)
 
-        # Crear diccionario de la función objetivo
         objective = {
             "type": problem_type,
             "coefficients": {f"x{i+1}": float(objective_list[i]) for i in range(num_vars)}
@@ -61,11 +60,9 @@ def new_problem():
             "restricciones": restricciones
         }
 
-        # (Temporal) Mostrar en consola para verificar
-        import json
-        print(json.dumps(problem_data, indent=4, ensure_ascii=False))
+        # Guardar el problema para usarlo luego en el solver
+        storage.save_problem({"problema_definicion": problem_data})
 
-        # TODO: aquí se podría guardar o enviar al solver
         flash("Problema cargado correctamente.", "success")
         return render_template("preview.html", problem_data=problem_data)
 

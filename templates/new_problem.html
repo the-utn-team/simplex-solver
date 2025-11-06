@@ -4,13 +4,64 @@
     <meta charset="UTF-8">
     <title>Nuevo Problema - Simplex Solver</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* 💡 Estilo del botón principal */
+        .btn-submit {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-submit:hover:enabled {
+            background-color: #0056b3;
+        }
+
+        .btn-submit:disabled {
+            background-color: #c0c0c0;
+            color: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+
+        /* 🔴 Solo se activa en inputs inválidos luego del intento de enviar */
+        .input-error {
+            border: 2px solid #dc3545;
+        }
+
+        .error-msg {
+            color: #dc3545;
+            font-size: 0.85em;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .error-msg.active {
+            display: block;
+        }
+    </style>
 </head>
+
 <body>
     <div class="container">
+        <!-- Mensajes flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
         <h1>Simplex Solver</h1>
         <p class="subtitle">Ingresa tu problema de programación lineal</p>
 
-        <form method="POST" action="{{ url_for('ui.new_problem') }}">
+        <form id="formularioSimplex" method="POST" action="{{ url_for('ui.new_problem') }}">
             
             <!-- Tipo de problema -->
             <section class="problem-type">
@@ -35,9 +86,10 @@
                     termDiv.classList.add("term-row");
 
                     termDiv.innerHTML = `
-                        <input type="number" class="coef-input" name="objective[]" placeholder="Coef" required>
+                        <input type="number" class="coef-input" name="objective[]" placeholder="Coef" step="any">
                         <span class="variable-label">x${termCount}</span>
                         <button type="button" class="btn-delete" title="Eliminar término">🗑️</button>
+                        <div class="error-msg">Usa puntos en lugar de comas.</div>
                     `;
 
                     termDiv.querySelector(".btn-delete").addEventListener("click", () => {
@@ -59,14 +111,12 @@
                 }
 
                 function updateConstraintInputs() {
-                    // Ajusta las restricciones existentes cuando cambia el número de coeficientes
                     const constraints = document.querySelectorAll(".constraint");
                     constraints.forEach(constraint => {
                         const inputs = constraint.querySelectorAll(".constraint-coef");
                         const diff = termCount - inputs.length;
 
                         if (diff > 0) {
-                            // Agregar inputs faltantes
                             for (let i = inputs.length + 1; i <= termCount; i++) {
                                 const input = document.createElement("input");
                                 input.type = "number";
@@ -77,7 +127,6 @@
                                 constraint.insertBefore(input, constraint.querySelector("select"));
                             }
                         } else if (diff < 0) {
-                            // Eliminar inputs sobrantes
                             for (let i = 0; i < Math.abs(diff); i++) {
                                 constraint.querySelectorAll(".constraint-coef")[inputs.length - 1 - i].remove();
                             }
@@ -93,25 +142,19 @@
                 <button type="button" id="add-constraint" class="btn-secondary">Añadir restricción</button>
             </section>
 
-            <div id="problem-preview" class="preview-box hidden">
-                <h3>Vista previa del problema:</h3>
-                <pre id="preview-text"></pre>
-            </div>
-            <button type="button" id="preview-problem" class="btn-secondary">Generar vista previa</button>
-            
-            <button type="submit" class="btn-submit">Cargar Problema</button>
+            <!-- Botón de envío principal -->
+            <button id="btnCalcular" type="submit" class="btn-submit" disabled>Cargar Problema</button>
 
         </form>
     </div>
 
+    <!-- Añadir restricción -->
     <script>
-        // Añadir una nueva restricción
         document.getElementById("add-constraint").addEventListener("click", function() {
             const container = document.getElementById("constraints-container");
             const div = document.createElement("div");
             div.className = "constraint";
 
-            // Crear coeficientes según la cantidad actual de variables (termCount)
             let coefInputs = "";
             for (let i = 1; i <= termCount; i++) {
                 coefInputs += `<input type="number" class="constraint-coef" name="constraint_${i}[]" placeholder="a${i}" step="any"> `;
@@ -126,6 +169,7 @@
                 </select>
                 <input type="number" name="constraint_rhs[]" placeholder="b" step="any">
                 <button type="button" class="delete-btn" onclick="removeConstraint(this)">🗑</button>
+                <div class="error-msg">Usa puntos en lugar de comas.</div>
             `;
             container.appendChild(div);
         });
@@ -135,6 +179,7 @@
         }
     </script>
 
+    <!-- Generar vista previa -->
     <script>
         document.getElementById("preview-problem").addEventListener("click", showPreview);
 
@@ -143,14 +188,10 @@
             const coefInputs = document.querySelectorAll('#objective-terms input[type="number"]');
             const constraints = document.querySelectorAll('.constraint');
 
-            // Construir función objetivo
             let text = `${type === "maximize" ? "Maximizar" : "Minimizar"}:\nZ = `;
-            text += Array.from(coefInputs)
-                .map((input, i) => `${input.value || 0}x${i + 1}`)
-                .join(" + ");
+            text += Array.from(coefInputs).map((input, i) => `${input.value || 0}x${i + 1}`).join(" + ");
             text += `\nSujeto a:\n`;
 
-            // Construir restricciones
             constraints.forEach((constraint) => {
                 const coefInputs = constraint.querySelectorAll('input[type="number"]:not([name*="rhs"])');
                 const sign = constraint.querySelector('select')?.value || "<=";
@@ -163,17 +204,63 @@
                 text += `${expr} ${sign} ${rhs}\n`;
             });
 
-            // Condición de no negatividad
             const nonNeg = Array.from(coefInputs)
                 .map((_, i) => `x${i + 1} ≥ 0`)
                 .join(", ");
             text += `${nonNeg}`;
 
-            // Mostrar vista previa
             document.getElementById("preview-text").textContent = text;
             document.getElementById("problem-preview").classList.remove("hidden");
         }
     </script>
 
+    <!-- 🔒 VALIDACIÓN Y BLOQUEO DE BOTÓN -->
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const form = document.getElementById("formularioSimplex");
+            const botonCalcular = document.getElementById("btnCalcular");
+
+            function validarFormulario(mostrarErrores = false) {
+                let valido = true;
+                const inputs = form.querySelectorAll("input[type='number']");
+
+                inputs.forEach(input => {
+                    const valor = input.value.trim();
+                    const errorMsg = input.parentElement.querySelector(".error-msg");
+
+                    if (valor.includes(",")) {
+                        valido = false;
+                        if (mostrarErrores) {
+                            input.classList.add("input-error");
+                            if (errorMsg) errorMsg.classList.add("active");
+                        }
+                    } else if (valor === "" || isNaN(valor)) {
+                        valido = false;
+                        if (mostrarErrores) {
+                            input.classList.add("input-error");
+                            if (errorMsg) errorMsg.classList.remove("active");
+                        }
+                    } else {
+                        input.classList.remove("input-error");
+                        if (errorMsg) errorMsg.classList.remove("active");
+                    }
+                });
+
+                botonCalcular.disabled = !valido;
+                return valido;
+            }
+
+            form.addEventListener("input", () => validarFormulario(false));
+
+            form.addEventListener("submit", (event) => {
+                if (!validarFormulario(true)) {
+                    event.preventDefault();
+                    alert("Corrige los errores antes de calcular el problema.");
+                }
+            });
+        });
+    </script>
+
 </body>
 </html>
+
