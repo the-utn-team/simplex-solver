@@ -13,20 +13,20 @@
         <div class="preview-box">
             <h3>Función objetivo</h3>
             <pre class="preview-text">
-{{ problem_data.funcion_objetivo.type | capitalize }}:
+{{ problem_data['funcion_objetivo']['type'] | capitalize }}:
 Z = 
-{% for var, coef in problem_data.funcion_objetivo.coefficients.items() -%}
+{% for var, coef in problem_data['funcion_objetivo']['coefficients'].items() -%}
 {{ coef }}{{ var }}{% if not loop.last %} + {% endif %}
 {% endfor %}
             </pre>
 
             <h3>Restricciones</h3>
             <pre class="preview-text">
-{% for restriccion in problem_data.restricciones %}
-{% for var, coef in restriccion.coefficients.items() -%}
+{% for restriccion in problem_data['restricciones'] %}
+{% for var, coef in restriccion['coefficients'].items() -%}
 {{ coef }}{{ var }}{% if not loop.last %} + {% endif %}
 {% endfor %}
- {{ restriccion.operator }} {{ restriccion.rhs }}
+ {{ restriccion['operator'] }} {{ restriccion['rhs'] }}
 {% endfor %}
             </pre>
         </div>
@@ -34,7 +34,6 @@ Z =
         <div class="button-group">
             <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Volver</a>
             <form action="{{ url_for('ui.solve_problem') }}" method="POST" style="display:inline;">
-                <input type="hidden" name="problem_data" value="{{ problem_data | tojson }}">
                 <button type="submit" class="btn-submit">Resolver Problema</button>
             </form>
         </div>

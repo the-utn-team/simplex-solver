@@ -141,3 +141,16 @@ class StorageService:
         """Carga la función objetivo más reciente."""
         return StorageService.load_json(prefix=PREFIX_FUNCION_OBJETIVO)
 
+    def load_problem(self) -> dict:
+        """Carga el problema completo (función objetivo + restricciones)."""
+        return self.load_json(prefix="problema_")
+
+    @staticmethod
+    def save_problem(problem_data: dict) -> str:
+        """Guarda la definición del problema (FO + restricciones)."""
+        return StorageService.save_json(problem_data, prefix="problema_")
+
+    @staticmethod
+    def load_solution() -> dict:
+        """Carga la última solución guardada."""
+        return StorageService.load_json(prefix=PREFIX_SOLUCION)

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Resultado - Simplex Solver</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Resultado del Método Simplex</h1>
+
+        {% if solucion %}
+            <h3>Estado:</h3>
+            <p>{{ solucion['solucion_encontrada']['status'] }}</p>
+
+            {% if solucion['solucion_encontrada']['valores_variables'] %}
+            <h3>Variables:</h3>
+            <ul>
+                {% for var, val in solucion['solucion_encontrada']['valores_variables'].items() %}
+                <li>{{ var }} = {{ "%.4f"|format(val) }}</li>
+                {% endfor %}
+            </ul>
+
+            <h3>Valor Óptimo (Z):</h3>
+            <p>{{ "%.4f"|format(solucion['solucion_encontrada']['valor_optimo_z']) }}</p>
+            {% else %}
+            <p>No se encontró una solución factible.</p>
+            {% endif %}
+        {% else %}
+            <p>Error: No hay datos de solución disponibles.</p>
+        {% endif %}
+
+        <div class="button-group">
+            <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Nuevo problema</a>
+        </div>
+    </div>
+</body>
+</html>
