@@ -4,10 +4,12 @@ Define un conjunto de rutas relacionadas con la interfaz del usuario.
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, json, jsonify
+from app.controllers.solver_controller import SolverController
+from app.services import StorageService
 import os
 
 ui_bp = Blueprint('ui', __name__)
-
+storage = StorageService()
 
 @ui_bp.route('/')
 def index():
@@ -54,18 +56,18 @@ def new_problem():
             })
 
         # Estructura completa del problema
-        problema = {
+        problem_data = {
             "funcion_objetivo": objective,
             "restricciones": restricciones
         }
 
         # (Temporal) Mostrar en consola para verificar
         import json
-        print(json.dumps(problema, indent=4, ensure_ascii=False))
+        print(json.dumps(problem_data, indent=4, ensure_ascii=False))
 
         # TODO: aquí se podría guardar o enviar al solver
         flash("Problema cargado correctamente.", "success")
-        return render_template("preview.html", problem_data=problema)
+        return render_template("preview.html", problem_data=problem_data)
 
     return render_template("new_problem.html")
 
@@ -94,15 +96,30 @@ def load_problem():
 
 
 @ui_bp.route('/preview', methods=['POST'])
-def preview():
+def preview_problem():
     """
-    Muestra la vista previa del problema antes de resolverlo.
+    Recibe los datos del problema (desde /new),
+    los guarda y muestra la vista previa.
     """
+    try:
+        problem_data = {
+            "funcion_objetivo": {
+                "type": request.form.get("tipo", "maximize"),
+                "coefficients": json.loads(request.form.get("coeficientes", "{}"))
+            },
+    "restricciones": json.loads(request.form.get("restricciones", "[]"))
+    }
 
-    # Simula recepción del problema desde el formulario o JSON
-    problem_data = json.loads(request.form.get("problem_data"))
 
-    return render_template("preview.html", problem_data=problem_data)
+        # Guardar el problema en JSON para el solver
+        storage = StorageService()
+        storage.save_problem({"problema_definicion": problem_data})
+
+        return render_template("preview.html", problem_data=problem_data)
+
+    except Exception as e:
+        flash(f"Error al procesar el problema: {e}", "error")
+        return redirect(url_for("ui.new_problem"))
 
 
 @ui_bp.route('/procesar_formulario', methods=['POST'])
@@ -111,24 +128,26 @@ def procesar_formulario():
     print("Datos recibidos:", data)
     return jsonify({"status": "ok", "data_recibida": data}), 200
 
-
 @ui_bp.route('/solve', methods=['POST'])
 def solve_problem():
     """
-    Procesa el problema recibido desde la vista previa y ejecuta el solver (simulado por ahora).
+    Ejecuta el solver y muestra los resultados.
     """
-    import json
+    try:
+        # Ejecutar el controlador principal del solver
+        solver = SolverController()
+        solver.run()  # Internamente carga los JSON guardados
 
-    # Obtener datos enviados
-    data_raw = request.form.get("problem_data")
-    if not data_raw:
-        return "<p>Error: No se recibieron datos del problema.</p>", 400
+        # Cargar el reporte final generado
+        storage = StorageService()
+        solution_report = storage.load_solution()
 
-    problem_data = json.loads(data_raw)
+        if not solution_report:
+            flash("No se encontró el reporte de solución.", "error")
+            return redirect(url_for("ui.index"))
 
-    # Por ahora, solo mostramos por consola
-    print("Problema recibido para resolver:")
-    print(json.dumps(problem_data, indent=4))
+        return render_template("solution.html", solucion=solution_report)
 
-    flash("Problema enviado correctamente al solver (simulado).", "success")
-    return redirect(url_for("ui.index"))
+    except Exception as e:
+        flash(f"Error durante la resolución: {e}", "error")
+        return redirect(url_for("ui.index"))
