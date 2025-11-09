@@ -15,8 +15,21 @@ body {
     padding: 40px 50px;
     border-radius: 16px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-    max-width: 650px;
+    /* --- CAMBIO --- 
+       Volvemos al ancho original para que
+       NO afecte a new_problem.html y otras.
+    */
+    max-width: 650px; 
     width: 100%;
+    box-sizing: border-box; 
+}
+
+/* --- NUEVA CLASE --- 
+   Esta clase la usaremos SOLO en solution.html
+   para sobrescribir el ancho.
+*/
+.container-solution {
+    max-width: 1050px; 
 }
 
 h1 {
@@ -202,3 +215,57 @@ input:valid {
     margin-bottom: 15px; /* espacio entre elementos */
     font-size: 16px; /* opcional: tamaño más cómodo de leer */
 }
+
+
+/* ---------------------------------------------- */
+/* --- INICIO: ESTILOS MODIFICADOS PARA GILP --- */
+/* ---------------------------------------------- */
+
+.gilp-container {
+    width: 100%;
+    /* --- CAMBIO --- 
+       Volvemos a poner la barra de scroll
+       que querías al principio.
+    */
+    overflow-x: auto; 
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #f9f9f9;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+
+    /* --- CAMBIO --- 
+       Quitamos el centrado con flexbox.
+    */
+}
+
+.gilp-container table {
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    width: auto; 
+    font-size: 0.9rem;
+
+    /* --- CAMBIO --- 
+       Quitamos los estilos de 'block' y 'overflow'
+       de la tabla, ya que el padre (.gilp-container)
+       se encargará del scroll.
+    */
+}
+
+.gilp-container th, 
+.gilp-container td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+    /* Quitamos el nowrap que ya no es necesario */
+}
+
+.gilp-container th {
+    background-color: #f2f2f2;
+}
+
+/* ---------------------------------------------- */
+/* --- FIN: ESTILOS MODIFICADOS PARA GILP --- */
+/* ---------------------------------------------- */

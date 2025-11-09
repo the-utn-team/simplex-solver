@@ -8,6 +8,7 @@ from app.controllers.solver_controller import SolverController
 from app.services import StorageService
 import os
 
+
 ui_bp = Blueprint('ui', __name__)
 storage = StorageService()
 

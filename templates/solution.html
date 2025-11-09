@@ -6,9 +6,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
+    <div class="container container-solution">
         <h1>Resultado del Método Simplex</h1>
 
+        <!-- Tu código original para mostrar la solución de Scipy -->
         {% if solucion %}
             <h3>Estado:</h3>
             <p class="preview-text">{{ solucion['solucion_encontrada']['status'] }}</p>
@@ -29,7 +30,37 @@
         {% else %}
             <p class="preview-text">Error: No hay datos de solución disponibles.</p>
         {% endif %}
+        <!-- Fin de tu código original -->
 
+
+        <!-- 
+          INICIO: Bloque añadido para Gilp
+          Esto renderizará las tablas y gráficos usando la clase .gilp-container
+          que definirás en tu archivo style.css
+        -->
+        <h3 style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
+            Visualización geométrica del problema
+        </h3>
+
+        {% if solucion.visualizacion_gilp_html %}
+            <!-- 
+              El filtro |safe es CRUCIAL. 
+              Le dice a la plantilla que renderice el HTML 
+              en lugar de mostrarlo como texto.
+            -->
+            <div class="gilp-container">
+                {{ solucion.visualizacion_gilp_html | safe }}
+            </div>
+
+        {% else %}
+            <p class="preview-text">
+                (Visualización no disponible para este problema).
+            </p>
+        {% endif %}
+        <!-- FIN: Bloque añadido para Gilp -->
+
+
+        <!-- Tu botón original -->
         <div class="button-group">
             <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Nuevo problema</a>
         </div>
