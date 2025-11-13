@@ -1,16 +1,18 @@
 """
 Tests para el SolverController (Issue #7 y guardado de reporte).
 Estos tests usan 'mocker' para simular:
-1. La carga de archivos (StorageService.load_...)
+1. La carga de archivos (StorageService.load_problem...)
 2. La ejecución de Scipy (linprog)
 3. El guardado del reporte (StorageService.save_solution)
 
 Esto nos permite testear que el controlador llame a 'save_solution'
 con el diccionario 'final_report' estructurado correctamente.
 """
+
 import pytest
 import numpy as np
 from scipy.optimize import OptimizeResult
+from gilp import LP, simplex_visual  # Import explícito de gilp
 from app.controllers.solver_controller import SolverController
 
 # --- Datos de Prueba (Mock Data) ---
@@ -35,7 +37,7 @@ MOCK_SCIPY_RESULT_MIN = OptimizeResult({
 })
 
 
-# Problema 2 (Maximizar) - Corregido al resultado real del solver
+# Problema 2 (Maximizar) 
 # Z = 15x1 + 18x2
 MOCK_OBJECTIVE_MAX = {
     'type': 'maximize',
@@ -59,9 +61,14 @@ MOCK_SCIPY_RESULT_MAX = OptimizeResult({
 @pytest.fixture
 def controller(mocker):
     """Crea una instancia del SolverController con StorageService 'mockeado'."""
-    # Mockear (simular) la LECTURA
-    mocker.patch('app.services.StorageService.load_objective_function', return_value=MOCK_OBJECTIVE_MAX)
-    mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MAX)
+    # Mockear (simular) la LECTURA 
+    problema_completo = {
+        "problema_definicion": {
+            "funcion_objetivo": MOCK_OBJECTIVE_MAX,
+            "restricciones": MOCK_CONSTRAINTS_MAX
+        }
+    }
+    mocker.patch('app.services.StorageService.load_problem', return_value=problema_completo)
     return SolverController()
 
 # --- Tests ---
@@ -69,7 +76,6 @@ def controller(mocker):
 def test_prepare_model_for_scipy_maximize(controller):
     """
     Testea la 'traducción' de un problema de Maximización.
-    (Esta prueba no cambia)
     """
     controller._load_data_from_json() 
     variables = controller.variables 
@@ -93,7 +99,6 @@ def test_prepare_model_for_scipy_maximize(controller):
 def test_prepare_model_for_scipy_minimize(controller):
     """
     Testea la 'traducción' de un problema de Minimización.
-    (Esta prueba no cambia)
     """
     controller.objective_data = MOCK_OBJECTIVE_MIN
     controller.constraints_data = MOCK_CONSTRAINTS_MIN
@@ -123,35 +128,36 @@ def test_run_success_maximize(mocker, capsys):
     1. El 'print' en consola.
     2. Que se llame a 'save_solution' con el reporte correcto.
     """
-    # 1. Mockear Lectura (StorageService)
-    mocker.patch('app.services.StorageService.load_objective_function', return_value=MOCK_OBJECTIVE_MAX)
-    mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MAX)
+    # 1. Mockear Lectura - Usamos load_problem
+    problema_completo = {
+        "problema_definicion": {
+            "funcion_objetivo": MOCK_OBJECTIVE_MAX,
+            "restricciones": MOCK_CONSTRAINTS_MAX
+        }
+    }
+    mocker.patch('app.services.StorageService.load_problem', return_value=problema_completo)
     
     # 2. Mockear Cálculo (Scipy.linprog)
-    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
     mocker.patch('app.controllers.solver_controller.linprog', return_value=MOCK_SCIPY_RESULT_MAX)
     
-    # 3. Mockear ESCRITURA (StorageService) - ¡Esto es lo nuevo!
-    # Creamos un "espía" (mock) para la función de guardado.
+    # 3. Mockear ESCRITURA (StorageService)
     mock_save = mocker.patch('app.services.StorageService.save_solution', return_value="outputs/solucion_mock.json")
     
     # 4. Ejecutar
     controller = SolverController()
     controller.run()
     
-    # 5. Verificar el print (como antes)
+    # 5. Verificar el print
     captured = capsys.readouterr()
     output = captured.out
     
-    assert "¡Se encontró una solución factible! ✅" in output
-    # Usamos los valores correctos con 4 decimales
+    assert "¡Se encontró una solución factible!" in output
     assert "x1 = 388.8889" in output 
     assert "x2 = 222.2222" in output
     assert "Z = 9833.3333" in output
     assert "Reporte de solución guardado en: outputs/solucion_mock.json" in output
 
-    # 6. Verificar el guardado (¡Esto es lo nuevo!)
-    # Preguntamos si nuestro "espía" (mock_save) fue llamado
+    # 6. Verificar el guardado
     mock_save.assert_called_once()
     
     # Obtenemos los argumentos con los que fue llamado
@@ -168,12 +174,16 @@ def test_run_success_maximize(mocker, capsys):
 
 def test_run_success_minimize(mocker, capsys):
     """Testea el flujo 'run' completo para MINIMIZAR y verifica el guardado."""
-    # 1. Mocks de Lectura
-    mocker.patch('app.services.StorageService.load_objective_function', return_value=MOCK_OBJECTIVE_MIN)
-    mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MIN)
+    # 1. Mocks de Lectura 
+    problema_completo_min = {
+        "problema_definicion": {
+            "funcion_objetivo": MOCK_OBJECTIVE_MIN,
+            "restricciones": MOCK_CONSTRAINTS_MIN
+        }
+    }
+    mocker.patch('app.services.StorageService.load_problem', return_value=problema_completo_min)
     
     # 2. Mock de Cálculo
-    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
     mocker.patch('app.controllers.solver_controller.linprog', return_value=MOCK_SCIPY_RESULT_MIN)
     
     # 3. Mock de Escritura
@@ -186,7 +196,7 @@ def test_run_success_minimize(mocker, capsys):
     # 5. Verificar Print
     captured = capsys.readouterr()
     output = captured.out
-    assert "Z = 108.6957" in output # Redondeado a 4 decimales
+    assert "Z = 108.6957" in output
     
     # 6. Verificar Guardado
     mock_save.assert_called_once()
@@ -194,17 +204,21 @@ def test_run_success_minimize(mocker, capsys):
     
     assert saved_report['problema_definicion']['funcion_objetivo'] == MOCK_OBJECTIVE_MIN
     assert saved_report['solucion_encontrada']['status'] == "Solucion Factible"
-    assert saved_report['solucion_encontrada']['valor_optimo_z'] == pytest.approx(108.695652) # Positivo
+    assert saved_report['solucion_encontrada']['valor_optimo_z'] == pytest.approx(108.695652)
 
 def test_run_infeasible(mocker, capsys):
     """Testea el 'print' y el 'guardado' cuando no hay solución."""
-    # 1. Mocks de Lectura
-    mocker.patch('app.services.StorageService.load_objective_function', return_value=MOCK_OBJECTIVE_MAX)
-    mocker.patch('app.services.StorageService.load_constraints', return_value=MOCK_CONSTRAINTS_MAX)
+    # 1. Mocks de Lectura 
+    problema_completo = {
+        "problema_definicion": {
+            "funcion_objetivo": MOCK_OBJECTIVE_MAX,
+            "restricciones": MOCK_CONSTRAINTS_MAX
+        }
+    }
+    mocker.patch('app.services.StorageService.load_problem', return_value=problema_completo)
     
     # 2. Mock de Cálculo (para que falle)
     mock_fail_result = OptimizeResult({'success': False, 'status': 2, 'message': 'Infeasible.'})
-    # ¡¡ESTA ES LA LÍNEA CORREGIDA!!
     mocker.patch('app.controllers.solver_controller.linprog', return_value=mock_fail_result)
 
     # 3. Mock de Escritura
@@ -217,7 +231,7 @@ def test_run_infeasible(mocker, capsys):
     # 5. Verificar Print
     captured = capsys.readouterr()
     output = captured.out
-    assert "Sin Solucion Factible ❌" in output
+    assert "Sin Solucion Factible " in output
 
     # 6. Verificar Guardado
     mock_save.assert_called_once()
@@ -230,11 +244,9 @@ def test_run_infeasible(mocker, capsys):
 def test_run_load_data_fails(mocker, capsys):
     """
     Testea que 'save_solution' NO se llame si la carga falla.
-    (Esta prueba no cambia, pero es bueno verificarlo).
     """
     # 1. Mock de Lectura (para que falle)
-    mocker.patch('app.services.StorageService.load_objective_function', return_value=None)
-    mocker.patch('app.services.StorageService.load_constraints', return_value=None)
+    mocker.patch('app.services.StorageService.load_problem', return_value=None)
     
     # 2. Mock de Escritura
     mock_save = mocker.patch('app.services.StorageService.save_solution')
@@ -246,8 +258,7 @@ def test_run_load_data_fails(mocker, capsys):
     # 4. Verificar Print
     captured = capsys.readouterr()
     output = captured.out
-    # Corregir el mensaje de error para que coincida con el código
-    assert "No se encontraron datos" in output
+    assert "No se encontró el archivo 'problem_definition.json' o no tiene el formato esperado." in output  # Cambio: Ajustado al mensaje real de tu código
     
     # 5. Verificar que NO se guardó
     mock_save.assert_not_called()

@@ -35,10 +35,6 @@ def test_parse_valid_expressions(expression, expected_coefs, operator, rhs):
     ("2x1 + 3x2 <= Diez", "número válido"),
     ("2a + 3b <= 10", "Formato inválido en el lado izquierdo"),
     ("2x1 + 3x1 <= 10", "Variable duplicada: x1"),
-    # --- INICIO DE CORRECCIÓN ---
-    # ("2x1 + 3x3 <= 10", "Falta la variable x2"),      <-- ESTA LÍNEA SE QUITA (Bug #2 Arreglado)
-    # ("2x2 + 3x3 <= 10", "debe comenzar en x1"),   <-- ESTA LÍNEA SE QUITA (Bug #2 Arreglado)
-    # --- FIN DE CORRECCIÓN ---
     ("2x1 + 3x2 + 5 <= 10", "términos no reconocidos"),
 ])
 def test_parse_invalid_expressions(expression, error_message):

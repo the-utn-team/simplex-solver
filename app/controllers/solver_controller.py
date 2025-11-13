@@ -240,7 +240,7 @@ class SolverController:
         solution_found = {}
 
         if result.success:
-            print("¡Se encontró una solución factible! ✅\n")
+            print("¡Se encontró una solución factible! \n")
             print("Valores de las variables:")
             
             solution_vars = {}
@@ -262,7 +262,7 @@ class SolverController:
             
         else:
             status_message = "Sin Solucion Factible" if result.status == 2 else "Error"
-            print(f"{status_message} ❌")
+            print(f"{status_message} ")
             if result.status != 2:
                 print(f"(Estado: {result.message})")
 
