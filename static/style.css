@@ -216,6 +216,23 @@ input:valid {
     font-size: 16px; /* opcional: tamaño más cómodo de leer */
 }
 
+input[type="file"] {
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.form-load label {
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+    text-align: center;
+}
+
 
 /* ---------------------------------------------- */
 /* --- INICIO: ESTILOS MODIFICADOS PARA GILP --- */

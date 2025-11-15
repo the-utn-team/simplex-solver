@@ -6,7 +6,6 @@ Define un conjunto de rutas relacionadas con la interfaz del usuario.
 from flask import Blueprint, render_template, request, redirect, url_for, flash, json, jsonify
 from app.controllers.solver_controller import SolverController
 from app.services import StorageService
-import os
 
 
 ui_bp = Blueprint('ui', __name__)
@@ -70,27 +69,89 @@ def new_problem():
     return render_template("new_problem.html")
 
 
-@ui_bp.route('/load')
+@ui_bp.route('/load', methods=['GET', 'POST'])
 def load_problem():
     """
-    Vista para cargar un problema desde un archivo (.txt o .json).
+    Permite subir un archivo .json (formato exportado por la app).
+    Al enviar el archivo, valida JSON, guarda el problema y muestra la vista previa.
     """
-    if request.method == "POST":
-        file = request.files.get("problem_file")
-
+    if request.method == 'POST':
+        file = request.files.get('problem_file')
         if not file:
             flash("Selecciona un archivo antes de continuar.", "error")
             return redirect(url_for("ui.load_problem"))
 
-        # Guardar archivo en carpeta 'uploads'
-        os.makedirs("uploads", exist_ok=True)
-        filepath = os.path.join("uploads", file.filename)
-        file.save(filepath)
+        # Intentar parsear el JSON del archivo subido
+        try:
+            content = json.load(file)
+        except Exception as e:
+            flash(f"Archivo JSON inválido: {e}", "error")
+            return redirect(url_for("ui.load_problem"))
 
-        flash(f"Archivo '{file.filename}' cargado correctamente.", "success")
-        return redirect(url_for("ui.index"))
+        # Esperamos exactamente el formato exportado por la app:
+        # { "problema_definicion": { ... } }
+        problem = content.get("problema_definicion")
+        if not problem:
+            flash("El archivo no contiene 'problema_definicion'. Asegurate de subir el JSON exportado por la aplicación.", "error")
+            return redirect(url_for("ui.load_problem"))
 
+        # Validar el contenido del JSON
+        ok, msg = validate_problem_structure(problem)
+        if not ok:
+            flash(msg, "error")
+            return redirect(url_for("ui.load_problem"))
+
+        storage.save_problem({"problema_definicion": problem})
+        return render_template("preview.html", problem_data=problem)
+
+    # GET => mostrar formulario de carga
     return render_template("load_problem.html")
+
+def validate_problem_structure(problem: dict) -> tuple[bool, str]:
+    """
+    Valida que el JSON subido cumpla con la estructura mínima esperada.
+
+    Devuelve:
+        (True, "") si es válido
+        (False, "mensaje de error") si algo no coincide
+    """
+    if not isinstance(problem, dict):
+        return False, "El problema debe ser un objeto JSON."
+
+    fo = problem.get("funcion_objetivo")
+    if not fo:
+        return False, "Falta 'funcion_objetivo'."
+
+    if fo.get("type") not in ("maximize", "minimize"):
+        return False, "El tipo debe ser 'maximize' o 'minimize'."
+
+    coef = fo.get("coefficients")
+    if not isinstance(coef, dict) or not coef:
+        return False, "Los coeficientes de la función objetivo deben ser un objeto no vacío."
+
+    if not all(isinstance(v, (int, float)) for v in coef.values()):
+        return False, "Todos los coeficientes de la función objetivo deben ser numéricos."
+
+    restricciones = problem.get("restricciones")
+    if not isinstance(restricciones, list) or not restricciones:
+        return False, "Debe existir una lista de restricciones."
+
+    for r in restricciones:
+        if r.get("operator") not in ("<=", ">=", "="):
+            return False, "Cada restricción debe tener operator '<=', '>=' o '='."
+
+        if not isinstance(r.get("rhs"), (int, float)):
+            return False, "Cada restricción debe tener un RHS numérico."
+
+        coefs_r = r.get("coefficients")
+        if not isinstance(coefs_r, dict) or not coefs_r:
+            return False, "Cada restricción debe tener coeficientes."
+
+        if not all(isinstance(v, (int, float)) for v in coefs_r.values()):
+            return False, "Los coeficientes de cada restricción deben ser numéricos."
+
+    return True, ""
+
 
 
 @ui_bp.route('/preview', methods=['POST'])
@@ -108,9 +169,7 @@ def preview_problem():
     "restricciones": json.loads(request.form.get("restricciones", "[]"))
     }
 
-
         # Guardar el problema en JSON para el solver
-        storage = StorageService()
         storage.save_problem({"problema_definicion": problem_data})
 
         return render_template("preview.html", problem_data=problem_data)
@@ -137,7 +196,6 @@ def solve_problem():
         solver.run()  # Internamente carga los JSON guardados
 
         # Cargar el reporte final generado
-        storage = StorageService()
         solution_report = storage.load_solution()
 
         if not solution_report:
