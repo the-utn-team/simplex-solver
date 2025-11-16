@@ -38,8 +38,8 @@ class SolverController:
         Ejecuta el flujo principal del cálculo:
         1. Carga los datos de los JSON.
         2. Prepara el modelo para Scipy.
-        3. Genera la visualización de Gilp.
-        4. Ejecuta el solver.
+        3. [NUEVO] Ejecuta el solver de Scipy ANTES de visualizar.
+        4. [NUEVO] Si es factible, genera la visualización (Plan A o B).
         5. Muestra y guarda los resultados.
         """
         print("=== 3. Solución del Problema ===")
@@ -50,13 +50,12 @@ class SolverController:
                 self.objective_data, self.constraints_data, self.variables
             )
             
-            print("Generando visualización (Plan A: gilp)...")
-            visualization_html_str = self._generate_gilp_visualization()
-
-            # Opciones para el solver (corrección Bug #1)
-            solver_options = {"presolve": True, "time_limit": 10}
+            # 1. EJECUTAR EL SOLVER 
+            # Esto nos dirá si el problema es factible ANTES de intentar
+            # visualizar las tablas (que es donde se cuelga).
+            print("Ejecutando solver principal (Scipy)...")
+            solver_options = {"presolve": True, "time_limit": 10} # Ya tiene timeout
             
-            # 4. Ejecutar el solver (corrección Bug #1)
             result = linprog(
                 c, 
                 A_ub=A_ub, b_ub=b_ub, 
@@ -65,8 +64,22 @@ class SolverController:
                 method='highs-ds',
                 options=solver_options
             )
-            
-            # 5. Mostrar y GUARDAR los resultados
+
+            # 2. GENERAR VISUALIZACIÓN *SOLO SI ES FACTIBLE*
+            visualization_html_str = "" # String vacío por defecto
+
+            if result.success:
+                # El problema SÍ tiene solución. 
+                # Ahora es seguro llamar a las visualizaciones.
+                print("Generando visualización (Plan A: gilp)...")
+                visualization_html_str = self._generate_gilp_visualization()
+            else:
+                # El problema es INFACTIBLE o no acotado.
+                # Omitimos la visualización para evitar el cuelgue.
+                print("Problema infactible o no acotado. Omitiendo visualización.")
+                visualization_html_str = "<p>Visualización no disponible (Problema infactible o no acotado).</p>"
+
+            # 3. Mostrar y GUARDAR los resultados
             self._display_and_save_results(result, self.objective_data['type'], visualization_html_str)
 
         except FileNotFoundError as e:
