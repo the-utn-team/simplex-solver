@@ -6,6 +6,22 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <!-- --- INICIO DE CAMBIOS: AÑADE ESTE BLOQUE --- -->
+    <!-- Esto mostrará los mensajes de error (flash) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div style="padding: 1em; margin: 1em 2em; border-radius: 8px; background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24;">
+                <strong>¡Error!</strong>
+                <ul class=flashes>
+                {% for category, message in messages %}
+                    <li style="list-style-type: none;">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    {% endwith %}
+    <!-- --- FIN DE CAMBIOS --- -->
+
     <div class="container">
         <h1>Simplex Solver</h1>
         <p class="subtitle">Selecciona una opción para comenzar</p>
