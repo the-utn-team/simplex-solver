@@ -65,7 +65,7 @@ def new_problem():
 
         storage.save_problem({"problema_definicion": problem_data})
 
-        return render_template("preview.html", problem_data=problem_data)
+        return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     return render_template("new_problem.html")
 
@@ -99,9 +99,10 @@ def load_problem():
             return redirect(url_for("ui.load_problem"))
 
         storage.save_problem({"problema_definicion": problem})
-        return render_template("preview.html", problem_data=problem)
+        return render_template("preview.html", problem_data=problem, from_page="load")
 
     return render_template("load_problem.html")
+
 
 def validate_problem_structure(problem: dict) -> tuple[bool, str]:
     """
@@ -145,7 +146,6 @@ def validate_problem_structure(problem: dict) -> tuple[bool, str]:
     return True, ""
 
 
-
 @ui_bp.route('/preview', methods=['POST'])
 def preview_problem():
     """
@@ -163,7 +163,7 @@ def preview_problem():
 
         storage.save_problem({"problema_definicion": problem_data})
 
-        return render_template("preview.html", problem_data=problem_data)
+        return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     except Exception as e:
         flash(f"Error al procesar el problema: {e}", "error")
@@ -175,6 +175,7 @@ def procesar_formulario():
     data = request.get_json()  # si el formulario se envía como JSON
     print("Datos recibidos:", data)
     return jsonify({"status": "ok", "data_recibida": data}), 200
+
 
 @ui_bp.route('/solve', methods=['POST'])
 def solve_problem():
