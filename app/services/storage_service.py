@@ -14,7 +14,11 @@ from app.config import (
     OUTPUT_DIR, 
     PREFIX_FUNCION_OBJETIVO, 
     PREFIX_RESTRICCIONES,
-    PREFIX_SOLUCION 
+    PREFIX_SOLUCION,
+    # --- INICIO DE CAMBIOS ---
+    PREFIX_PROBLEMA, # Importamos el prefijo del problema
+    PREFIX_PDF         # Importamos el nuevo prefijo del PDF
+    # --- FIN DE CAMBIOS ---
 )
 
 class StorageService:
@@ -25,7 +29,7 @@ class StorageService:
         if not os.path.exists(OUTPUT_DIR):
             os.makedirs(OUTPUT_DIR)
 
-    # --- LÓGICA DE GUARDADO (Tu código original) ---
+    # --- LÓGICA DE NOMBRES DE ARCHIVO ---
 
     @staticmethod
     def _get_next_filename(prefix: str, extension: str = ".json") -> str:
@@ -38,9 +42,43 @@ class StorageService:
             number += 1
 
     @staticmethod
-    def save_json(data: Any, prefix: str) -> str:
+    def _get_latest_filename(prefix: str, extension: str = ".json") -> str: # <-- CAMBIO: Añadido extension
+        """Encuentra el archivo con el número más alto para un prefijo dado."""
+        if not os.path.exists(OUTPUT_DIR):
+            return None
+            
+        escaped_prefix = re.escape(prefix) 
+        # --- INICIO DE CAMBIOS ---
+        # Corregido para que coincida con la extensión exacta
+        escaped_extension = re.escape(extension)
+        pattern = re.compile(f"^{escaped_prefix}(\\d+){escaped_extension}$")
+        # --- FIN DE CAMBIOS ---
+        
+        latest_num = -1
+        latest_file = None
+
+        for f in os.listdir(OUTPUT_DIR):
+            match = pattern.match(f)
+            if match:
+                num = int(match.group(1))
+                if num > latest_num:
+                    latest_num = num
+                    latest_file = f
+        
+        if latest_file:
+            return os.path.join(OUTPUT_DIR, latest_file)
+        
+        return None
+
+    # --- LÓGICA DE GUARDADO DE JSON ---
+
+    @staticmethod
+    def save_json(data: Any, prefix: str, extension: str = ".json") -> str: # <-- CAMBIO: Añadido extension
         """Guarda datos en un nuevo archivo JSON secuencial."""
-        filename = StorageService._get_next_filename(prefix=prefix)
+        # --- INICIO DE CAMBIOS ---
+        # Pasamos la extensión al helper
+        filename = StorageService._get_next_filename(prefix=prefix, extension=extension)
+        # --- FIN DE CAMBIOS ---
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
@@ -72,52 +110,26 @@ class StorageService:
             report_data,
             prefix=PREFIX_SOLUCION
         )
-
-    # --- LÓGICA DE CARGA (Añadida para Issue #7) ---
-
+    
+    # --- INICIO DE CAMBIOS ---
+    # Convertido a staticmethod para que ui_controller pueda llamarlo
     @staticmethod
-    def _get_latest_filename(prefix: str) -> str:
-        """Encuentra el archivo con el número más alto para un prefijo dado."""
-        if not os.path.exists(OUTPUT_DIR):
-            return None
+    def save_problem(problem_data: dict) -> str:
+        """Guarda la definición del problema (FO + restricciones)."""
+        return StorageService.save_json(problem_data, prefix=PREFIX_PROBLEMA)
+    # --- FIN DE CAMBIOS ---
 
-        # --- INICIO DE LA CORRECCIÓN ---
-        # El error estaba aquí. Esta es la forma correcta y robusta
-        # de crear el patrón regex para que coincida con "prefijo" + "numeros" + ".json"
-        
-        # 1. Escapamos el prefijo por si tiene caracteres especiales
-        escaped_prefix = re.escape(prefix) 
-        
-        # 2. Creamos el patrón
-        # ^ -> inicio de la cadena
-        # (\d+) -> captura 1 o más dígitos (el número)
-        # \.json$ -> termina con ".json"
-        pattern = re.compile(f"^{escaped_prefix}(\\d+)\\.json$")
-        # --- FIN DE LA CORRECCIÓN ---
-        
-        latest_num = -1
-        latest_file = None
-
-        for f in os.listdir(OUTPUT_DIR):
-            match = pattern.match(f)
-            if match:
-                num = int(match.group(1))
-                if num > latest_num:
-                    latest_num = num
-                    latest_file = f
-        
-        if latest_file:
-            return os.path.join(OUTPUT_DIR, latest_file)
-        
-        return None # No se encontró ningún archivo
+    # --- LÓGICA DE CARGA DE JSON ---
 
     @staticmethod
     def load_json(prefix: str) -> Any:
         """Carga los datos del archivo JSON MÁS RECIENTE."""
-        filename = StorageService._get_latest_filename(prefix)
+        # --- INICIO DE CAMBIOS ---
+        # Pasamos la extensión .json
+        filename = StorageService._get_latest_filename(prefix, extension=".json")
+        # --- FIN DE CAMBIOS ---
         
         if not filename or not os.path.exists(filename):
-            # Este es el error que estás viendo
             raise FileNotFoundError(f"No se encontró ningún archivo con prefijo '{prefix}' en {OUTPUT_DIR}.")
             
         try:
@@ -141,16 +153,22 @@ class StorageService:
         """Carga la función objetivo más reciente."""
         return StorageService.load_json(prefix=PREFIX_FUNCION_OBJETIVO)
 
-    def load_problem(self) -> dict:
-        """Carga el problema completo (función objetivo + restricciones)."""
-        return self.load_json(prefix="problema_")
-
+    # --- INICIO DE CAMBIOS ---
+    # Convertido a staticmethod
     @staticmethod
-    def save_problem(problem_data: dict) -> str:
-        """Guarda la definición del problema (FO + restricciones)."""
-        return StorageService.save_json(problem_data, prefix="problema_")
+    def load_problem() -> dict:
+        """Carga el problema completo (función objetivo + restricciones)."""
+        return StorageService.load_json(prefix=PREFIX_PROBLEMA)
+    # --- FIN DE CAMBIOS ---
 
     @staticmethod
     def load_solution() -> dict:
         """Carga la última solución guardada."""
         return StorageService.load_json(prefix=PREFIX_SOLUCION)
+
+    # --- INICIO DE CAMBIOS (exportación en pdf) ---
+    @staticmethod
+    def get_new_pdf_path() -> str:
+        """Obtiene la ruta completa para el *próximo* archivo PDF."""
+        return StorageService._get_next_filename(prefix=PREFIX_PDF, extension=".pdf")
+    # --- FIN DE CAMBIOS ---

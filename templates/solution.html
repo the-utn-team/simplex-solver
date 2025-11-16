@@ -35,8 +35,6 @@
 
         <!-- 
           INICIO: Bloque añadido para Gilp
-          Esto renderizará las tablas y gráficos usando la clase .gilp-container
-          que definirás en tu archivo style.css
         -->
         <h3 style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">
             Visualización de tablas intermedias
@@ -45,8 +43,6 @@
         {% if solucion.visualizacion_gilp_html %}
             <!-- 
               El filtro |safe es CRUCIAL. 
-              Le dice a la plantilla que renderice el HTML 
-              en lugar de mostrarlo como texto.
             -->
             <div class="gilp-container">
                 {{ solucion.visualizacion_gilp_html | safe }}
@@ -63,6 +59,14 @@
         <!-- Tu botón original -->
         <div class="button-group">
             <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Nuevo problema</a>
+            
+            <!-- --- INICIO DE CAMBIOS (exportación en pdf) --- -->
+            <!-- Añadimos el botón de PDF -->
+            <a href="{{ url_for('ui.exportar_pdf') }}" class="btn-primary" style="margin-left: 10px;" target="_blank">
+                Exportar a PDF
+            </a>
+            <!-- --- FIN DE CAMBIOS --- -->
+
         </div>
     </div>
 </body>
