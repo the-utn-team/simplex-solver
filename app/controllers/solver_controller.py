@@ -1,14 +1,28 @@
 """
 Controlador para el Cálculo Simplex (Issue #7).
 Carga los datos de los JSON, los traduce para Scipy y muestra la solución.
+Estrategia Híbrida de Visualización:
+1. Intenta generar la visualización con 'gilp' (Plan A).
+2. Si 'gilp' falla, usa 'simple_simplex' (Plan B)
 """
 import numpy as np
 from scipy.optimize import linprog
 from app.services import StorageService
-# Importaciones necesarias para la visualización
-from gilp import LP, simplex_visual
 import tempfile
 import os
+import json
+
+# Plan A
+from gilp import LP, simplex_visual
+
+# Plan B (Fallback)
+from simple_simplex import (
+    create_tableau,
+    add_constraint,
+    add_objective,
+    optimize_json_format
+)
+
 
 class SolverController:
     """Controlador para el flujo de cálculo de la solución."""
@@ -17,7 +31,7 @@ class SolverController:
         self.storage = StorageService()
         self.objective_data = None
         self.constraints_data = None
-        self.variables = [] # Lista ordenada de variables (ej: ['x1', 'x2'])
+        self.variables = [] 
 
     def run(self):
         """
@@ -29,39 +43,31 @@ class SolverController:
         5. Muestra y guarda los resultados.
         """
         print("=== 3. Solución del Problema ===")
-        
         try:
-            if not self._load_data_from_json():
-                return
-            
+            if not self._load_data_from_json(): return
             print("Preparando modelo para el solver (Scipy)...")
             c, A_ub, b_ub, A_eq, b_eq, bounds = self._prepare_model_for_scipy(
                 self.objective_data, self.constraints_data, self.variables
             )
-
-            print("Generando visualización (gilp)...")
-            gilp_html_str = self._generate_gilp_visualization()
+            
+            print("Generando visualización (Plan A: gilp)...")
+            visualization_html_str = self._generate_gilp_visualization()
 
             # Opciones para el solver (corrección Bug #1)
-            solver_options = {
-                "presolve": True,
-                "time_limit": 10
-            }
-
+            solver_options = {"presolve": True, "time_limit": 10}
+            
             # 4. Ejecutar el solver (corrección Bug #1)
             result = linprog(
                 c, 
-                A_ub=A_ub, 
-                b_ub=b_ub, 
-                A_eq=A_eq, 
-                b_eq=b_eq, 
+                A_ub=A_ub, b_ub=b_ub, 
+                A_eq=A_eq, b_eq=b_eq, 
                 bounds=bounds, 
-                method='highs-ds', # Usamos Dual Simplex
+                method='highs-ds',
                 options=solver_options
             )
-
+            
             # 5. Mostrar y GUARDAR los resultados
-            self._display_and_save_results(result, self.objective_data['type'], gilp_html_str)
+            self._display_and_save_results(result, self.objective_data['type'], visualization_html_str)
 
         except FileNotFoundError as e:
             print(f"Error al cargar archivos JSON: {e}")
@@ -98,6 +104,7 @@ class SolverController:
         
         print(f"Datos cargados. Variables del modelo: {self.variables}")
         return True
+
 
     def _prepare_model_for_scipy(self, objective_data: dict, constraints_data: list, variables: list):
         """
@@ -147,7 +154,8 @@ class SolverController:
 
     def _generate_gilp_visualization(self) -> str:
         """
-        Usa gilp para crear la visualización de tablas intermedias y la retorna como un string HTML.
+        Plan A: Intenta usar 'gilp' para crear la visualización de tablas intermedias y la retorna como un string HTML.
+        Si falla, llama al Plan B ('simple_simplex').
         Convierte restricciones '>=' y '==' a '<=' para que gilp pueda procesarlas.
         """
         try:
@@ -185,7 +193,6 @@ class SolverController:
                     # 2. (A >= b)  ->  (-A <= -b)
                     A_gilp.append([-x for x in A_row])
                     b_gilp.append(-rhs_value)
-                    # --- FIN DE CORRECCIÓN ---
             
             if not A_gilp:
                 print("gilp: No se encontraron restricciones para visualizar.")
@@ -217,15 +224,127 @@ class SolverController:
             return html_content
 
         except Exception as e:
-            print(f"Error generando la visualización de gilp: {e}")
+            # --- Plan A falló ---
+            print(f"Error en 'gilp' (Plan A): {e}. Intentando Plan B (simple-simplex)...")
+            return self._generate_simple_simplex_fallback(e)
+
+    def _tableau_to_html(self, tableau_list: list, pivot_r: int, pivot_c: int) -> str:
+        """
+        Convierte una lista de listas en una tabla HTML.
+        Resalta la celda pivote (pivot_r, pivot_c) en rojo.
+        """
+        # Estilos inline para la celda pivote
+        pivot_style = 'style="background-color:#fff0f0; color:#d00; font-weight:bold;"'
+        
+        html = [
+            # Usamos las clases de Bootstrap/Pandas para que se vea bien con el CSS
+            # Y centramos la tabla
+            '<table class="table table-bordered table-striped" style="border:1px solid #ccc; justify-content:center; float:none; margin-left:auto; margin-right:auto;">'
+        ]
+        
+        # --- Encabezado de la Tabla (Columnas 0, 1, 2...) ---
+        html.append('<thead><tr>')
+        if tableau_list:
+            # Celda vacía para la esquina superior izquierda
+            html.append('<th></th>') 
+            for c_idx in range(len(tableau_list[0])):
+                html.append(f'<th>{c_idx}</th>')
+        html.append('</tr></thead>')
+        
+        # --- Cuerpo de la Tabla (Filas 0, 1, 2...) ---
+        html.append('<tbody>')
+        for r_idx, row in enumerate(tableau_list):
+            html.append('<tr>')
+            # Celda de encabezado de fila
+            html.append(f'<th>{r_idx}</th>')
+            
+            for c_idx, cell in enumerate(row):
+                style = ""
+                # ¡AQUÍ ESTÁ LA MAGIA!
+                if r_idx == pivot_r and c_idx == pivot_c:
+                    style = pivot_style
+                
+                html.append(f'<td {style}>{cell:.2f}</td>')
+            html.append('</tr>')
+        html.append('</tbody>')
+        
+        html.append('</table>')
+        return "".join(html)
+
+    def _generate_simple_simplex_fallback(self, gilp_error: Exception) -> str:
+        """
+        Plan B: Usa 'simple_simplex' para generar las tablas.
+        Este método se llama cuando 'gilp' falla.
+        """
+
+        try:
+            # 1. Traducir el problema al formato de simple_simplex
+            num_vars = len(self.variables)
+            num_constraints = len(self.constraints_data)
+            
+            tableau = create_tableau(
+                number_of_variables=num_vars,
+                number_of_constraints=num_constraints
+            )
+
+            # 2. Añadir restricciones
+            for const in self.constraints_data:
+                coeffs_list = [str(const['coefficients'].get(var, 0)) for var in self.variables]
+                coeffs_str = ",".join(coeffs_list)
+                op = const['operator']
+                op_str = "L" if op == '<=' else ("G" if op == '>=' else "E")
+                rhs_str = str(const['rhs'])
+                constraint_string = f"{coeffs_str},{op_str},{rhs_str}"
+                print(f"simple-simplex: add_constraint({constraint_string})")
+                add_constraint(tableau, constraint_string)
+
+            # 3. Añadir función objetivo
+            obj_coeffs_list = [str(self.objective_data['coefficients'].get(var, 0)) for var in self.variables]
+            obj_coeffs_str = ",".join(obj_coeffs_list)
+            is_maximize = (self.objective_data['type'] == 'maximize')
+            obj_type_str = "1" if is_maximize else "0"
+            objective_string = f"{obj_coeffs_str},{obj_type_str}"
+            print(f"simple-simplex: add_objective({objective_string})")
+            add_objective(tableau, objective_string)
+
+            # 4. Resolver y capturar el JSON COMPLETO
+            resultado_json = optimize_json_format(tableau, maximize=is_maximize)
+
+            # 5. Formatear como HTML
+            html_output = [
+            ]
+
+            if "pivotSteps" in resultado_json:
+                for step in resultado_json["pivotSteps"]:
+                    step_num = step.get("step", "?")
+                    pivot_row = step.get("pivotRowIndex") # Sin 'N/A'
+                    pivot_col = step.get("pivotColIndex") # Sin 'N/A'
+                    tableau_data = step.get("tableau", [])
+                    
+                    if step_num == 0 or pivot_row is None:
+                        html_output.append("<h4>Tabla Inicial (Iteración 0)</h4>")
+                    else:
+                        html_output.append(f"<h4>Iteración {step_num} (Pivote en Fila: {pivot_row}, Col: {pivot_col})</h4>")
+                    
+                    html_output.append(self._tableau_to_html(tableau_data, pivot_row, pivot_col))
+            else:
+                 html_output.append("<p>(No se encontraron 'pivotSteps' en la respuesta de simple-simplex).</p>")
+            
+            print("Visualización de 'simple-simplex' generada correctamente (Plan B).")
+            return "<br>".join(html_output)
+
+        except Exception as e:
+            # Si AMBOS fallan
+            print(f"Error en fallback 'simple-simplex' (Plan B): {e}")
             return f"""
             <div style='border: 1px solid red; padding: 10px; background-color: #fff0f0; border-radius: 8px;'>
-                <strong>Error al generar la visualización:</strong>
-                <p>{e}</p>
-                <p>La solución de Scipy es correcta, pero gilp no pudo procesar este problema.</p>
+                <strong>Error al generar la visualización de respaldo:</strong>
+                <p><b>Error de Gilp (Plan A):</b> {gilp_error}</p>
+                <p><b>Error del solver 'simple-simplex' (Plan B):</b> {e}</p>
+                <p>La solución de Scipy es correcta, pero ninguna visualización pudo procesar este problema.</p>
             </div>
             """
-    
+
     def _display_and_save_results(self, result, objective_type: str, gilp_html_output: str):
         """Muestra la solución de forma amigable y guarda el reporte completo."""
         

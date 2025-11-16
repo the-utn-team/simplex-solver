@@ -286,3 +286,49 @@ input[type="file"] {
 /* ---------------------------------------------- */
 /* --- FIN: ESTILOS MODIFICADOS PARA GILP --- */
 /* ---------------------------------------------- */
+
+
+/* --- ESTILOS PARA LAS TABLAS DE FALLBACK (simple-simplex / pandas) --- */
+
+/* Ajusta el contenedor gilp para que también se vea bien 
+   con las tablas de pandas y el texto <pre> */
+.gilp-container {
+    width: 100%;
+    overflow-x: auto; 
+    margin-bottom: 20px;
+    box-sizing: border-box; /* Asegura que el padding no rompa el ancho */
+}
+
+.gilp-container .table {
+    width: auto; /* Que la tabla no ocupe el 100% si no lo necesita */
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+    border-collapse: collapse;
+}
+
+.gilp-container .table th,
+.gilp-container .table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+.gilp-container .table th {
+    background-color: #f2f2f2;
+}
+
+.gilp-container .table-striped tbody tr:nth-of-type(odd) {
+    background-color: #f9f9f9;
+}
+
+/* Estilo para el JSON de resultado */
+.gilp-container pre {
+    background-color: #282c34; /* Fondo oscuro */
+    color: #abb2bf;           /* Texto claro */
+    padding: 15px;
+    border-radius: 8px;
+    font-family: "Courier New", Courier, monospace;
+    white-space: pre;          /* Respeta saltos de línea y espacios */
+    overflow-x: auto;          /* Scroll si es muy ancho */
+    text-align: left;
+}
