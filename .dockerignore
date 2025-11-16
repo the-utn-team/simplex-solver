@@ -1,0 +1,31 @@
+Python
+
+pycache/
+*.pyc
+*.pyo
+*.pyd
+
+Entorno virtual
+
+venv/
+*.venv/
+env/
+
+Pruebas y caché
+
+.pytest_cache/
+.cache/
+
+Git
+
+.git/
+.gitignore
+
+Docker
+
+.dockerignore
+Dockerfile
+
+Archivos de SO
+
+.DS_Store
