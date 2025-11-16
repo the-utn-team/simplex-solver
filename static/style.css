@@ -233,6 +233,16 @@ input[type="file"] {
     text-align: center;
 }
 
+.info-box {
+    background: #f3f3f3;
+    padding: 14px 18px;
+    border-left: 4px solid #4a4a4a;
+    border-radius: 6px;
+    font-size: 15px;
+    color: #333;
+    margin-bottom: 25px;
+    line-height: 1.4;
+}
 
 /* ---------------------------------------------- */
 /* --- INICIO: ESTILOS MODIFICADOS PARA GILP --- */

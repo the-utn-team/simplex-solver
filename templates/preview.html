@@ -57,11 +57,11 @@
             </div>
         </div>
 
-        <div class="button-group">
+        <div class="button-grofup">
             <form action="{{ url_for('ui.solve_problem') }}" method="POST" style="display:inline;">
                 <button type="submit" class="btn-submit">Resolver Problema</button>
             </form>
-            <a href="{{ url_for('ui.new_problem') }}" class="btn-secondary">← Volver</a>
+            <a class="btn btn-secondary" href="{{ url_for('ui.' + from_page + '_problem') }}">Volver</a>
         </div>
     </div>
 </body>

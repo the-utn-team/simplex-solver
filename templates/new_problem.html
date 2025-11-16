@@ -138,12 +138,22 @@
             <!-- Restricciones -->
             <section class="constraints-section">
                 <h3>Restricciones</h3>
+                <div class="info-box">
+                    <strong>Nota:</strong> No es necesario ingresar las restricciones de no negatividad.
+                    El sistema las asume automáticamente por defecto.
+                </div>
                 <div id="constraints-container" class="constraints-container"></div>
                 <button type="button" id="add-constraint" class="btn-secondary">Añadir restricción</button>
             </section>
 
-            <!-- Botón de envío principal -->
-            <button id="btnCalcular" type="submit" class="btn-submit" disabled>Cargar Problema</button>
+            <!-- Botones -->
+            <div class="button-container">
+                <button id="btnCalcular" type="submit" class="btn-submit" disabled>Cargar Problema</button>
+            </div>
+
+            <div class="button-container">
+                <a href="{{ url_for('ui.index') }}" class="btn-secondary">Volver</a>
+            </div>
 
         </form>
     </div>
