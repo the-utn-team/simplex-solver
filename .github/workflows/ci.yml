@@ -1,0 +1,40 @@
+# Nombre de tu "flujo de trabajo" (aparecerá en la pestaña Actions de GitHub)
+name: Pruebas de Python (CI)
+
+# Cuándo quieres que se ejecute
+on:
+  # Ejecútalo en cada 'push' a la rama 'main'
+  push:
+    branches: [ main ]
+  # Ejecútalo en cada 'pull request' que apunte a 'main'
+  pull_request:
+    branches: [ main ]
+
+# Qué trabajos (jobs) debe realizar
+jobs:
+  # Nombramos un trabajo, "build-and-test" 
+  build-and-test:
+    # La máquina virtual donde se ejecutará (Ubuntu es la más común y rápida)
+    runs-on: ubuntu-latest
+
+    # Los pasos (steps) a seguir
+    steps:
+    # 1. Clona tu repositorio en la máquina virtual
+    - uses: actions/checkout@v3
+
+    # 2. Configura un entorno de Python
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12' 
+
+    # 3. Instala las dependencias desde tu requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # 4. Ejecuta tus tests con pytest
+    - name: Run tests
+      run: |
+        pytest

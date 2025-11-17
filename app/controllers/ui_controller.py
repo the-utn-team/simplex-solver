@@ -3,9 +3,15 @@ Controlador para la interfaz gráfica.
 Define un conjunto de rutas relacionadas con la interfaz del usuario.
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, json, jsonify
+from flask import (
+    Blueprint, render_template, request, redirect, url_for, 
+    flash, json, jsonify, send_file
+)
 from app.controllers.solver_controller import SolverController
 from app.services import StorageService
+# ¡NUESTRAS NUEVAS IMPORTACIONES!
+from app.services.pdf_report_service import PdfReportService 
+import os 
 
 
 ui_bp = Blueprint('ui', __name__)
@@ -32,16 +38,14 @@ def new_problem():
         constraint_signs = request.form.getlist('constraint_sign[]')
         constraint_rhs = request.form.getlist('constraint_rhs[]')
 
-        # Cantidad de variables = cantidad de coeficientes de la función objetivo
         num_vars = len(objective_list)
         num_constraints = len(constraint_signs)
 
         objective = {
             "type": problem_type,
-            "coefficients": {f"x{i+1}": float(objective_list[i]) for i in range(num_vars)}
+            "coefficients": {f"x{i+1}": float(objective_list[i] if objective_list[i] else 0.0) for i in range(num_vars)}
         }
 
-        # Crear lista de restricciones
         restricciones = []
         for i in range(num_constraints):
             coefs = {}
@@ -54,17 +58,14 @@ def new_problem():
                 "rhs": float(constraint_rhs[i]) if constraint_rhs[i] else 0.0
             })
 
-        # Estructura completa del problema
         problem_data = {
             "funcion_objetivo": objective,
             "restricciones": restricciones
         }
 
-        # Guardar el problema para usarlo luego en el solver
         storage.save_problem({"problema_definicion": problem_data})
 
-        #flash("Problema cargado correctamente.", "success")
-        return render_template("preview.html", problem_data=problem_data)
+        return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     return render_template("new_problem.html")
 
@@ -81,39 +82,31 @@ def load_problem():
             flash("Selecciona un archivo antes de continuar.", "error")
             return redirect(url_for("ui.load_problem"))
 
-        # Intentar parsear el JSON del archivo subido
         try:
             content = json.load(file)
         except Exception as e:
             flash(f"Archivo JSON inválido: {e}", "error")
             return redirect(url_for("ui.load_problem"))
 
-        # Esperamos exactamente el formato exportado por la app:
-        # { "problema_definicion": { ... } }
         problem = content.get("problema_definicion")
         if not problem:
             flash("El archivo no contiene 'problema_definicion'. Asegurate de subir el JSON exportado por la aplicación.", "error")
             return redirect(url_for("ui.load_problem"))
 
-        # Validar el contenido del JSON
         ok, msg = validate_problem_structure(problem)
         if not ok:
             flash(msg, "error")
             return redirect(url_for("ui.load_problem"))
 
         storage.save_problem({"problema_definicion": problem})
-        return render_template("preview.html", problem_data=problem)
+        return render_template("preview.html", problem_data=problem, from_page="load")
 
-    # GET => mostrar formulario de carga
     return render_template("load_problem.html")
+
 
 def validate_problem_structure(problem: dict) -> tuple[bool, str]:
     """
     Valida que el JSON subido cumpla con la estructura mínima esperada.
-
-    Devuelve:
-        (True, "") si es válido
-        (False, "mensaje de error") si algo no coincide
     """
     if not isinstance(problem, dict):
         return False, "El problema debe ser un objeto JSON."
@@ -153,7 +146,6 @@ def validate_problem_structure(problem: dict) -> tuple[bool, str]:
     return True, ""
 
 
-
 @ui_bp.route('/preview', methods=['POST'])
 def preview_problem():
     """
@@ -166,13 +158,12 @@ def preview_problem():
                 "type": request.form.get("tipo", "maximize"),
                 "coefficients": json.loads(request.form.get("coeficientes", "{}"))
             },
-    "restricciones": json.loads(request.form.get("restricciones", "[]"))
-    }
+        "restricciones": json.loads(request.form.get("restricciones", "[]"))
+        }
 
-        # Guardar el problema en JSON para el solver
         storage.save_problem({"problema_definicion": problem_data})
 
-        return render_template("preview.html", problem_data=problem_data)
+        return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     except Exception as e:
         flash(f"Error al procesar el problema: {e}", "error")
@@ -185,17 +176,16 @@ def procesar_formulario():
     print("Datos recibidos:", data)
     return jsonify({"status": "ok", "data_recibida": data}), 200
 
+
 @ui_bp.route('/solve', methods=['POST'])
 def solve_problem():
     """
     Ejecuta el solver y muestra los resultados.
     """
     try:
-        # Ejecutar el controlador principal del solver
         solver = SolverController()
         solver.run()  # Internamente carga los JSON guardados
 
-        # Cargar el reporte final generado
         solution_report = storage.load_solution()
 
         if not solution_report:
@@ -207,3 +197,47 @@ def solve_problem():
     except Exception as e:
         flash(f"Error durante la resolución: {e}", "error")
         return redirect(url_for("ui.index"))
+
+# --- INICIO DE CAMBIOS (NUEVA FUNCIONALIDAD) ---
+
+@ui_bp.route('/exportar-pdf', methods=['GET'])
+def exportar_pdf():
+    """
+    Genera un reporte en PDF de la última solución (incluyendo tablas)
+    y lo envía al usuario para su descarga.
+    """
+    try:
+        # 1. Cargar el último reporte de solución (el JSON)
+        solution_report = StorageService.load_solution()
+        if not solution_report:
+            flash("No se encontró una solución para exportar.", "error")
+            return redirect(url_for("ui.index"))
+
+        # 2. Obtener un nombre para el nuevo archivo PDF
+        pdf_filepath = StorageService.get_new_pdf_path()
+
+        # 3. Inicializar el servicio de PDF
+        pdf_service = PdfReportService(solution_report, pdf_filepath)
+        
+        # 4. Generar el PDF
+        pdf_service.generate()
+
+        # 5. Enviar el archivo generado al usuario
+        return send_file(
+            pdf_filepath,
+            as_attachment=True,
+            download_name=os.path.basename(pdf_filepath) # ej: "reporte_solucion_3.pdf"
+        )
+
+    except FileNotFoundError as e:
+        flash(f"Error al cargar el reporte: {e}", "error")
+        # --- INICIO DE CORRECCIÓN (¡EL BUG ESTABA AQUÍ!) ---
+        return redirect(url_for("ui.index")) # Redirigir a una ruta GET segura
+        # --- FIN DE CORRECCIÓN ---
+    except Exception as e:
+        flash(f"Error al generar el PDF: {e}", "error")
+        # --- INICIO DE CORRECCIÓN (¡Y AQUÍ!) ---
+        return redirect(url_for("ui.index")) # Redirigir a una ruta GET segura
+        # --- FIN DE CORRECCIÓN ---
+
+# --- FIN DE CAMBIOS ---
