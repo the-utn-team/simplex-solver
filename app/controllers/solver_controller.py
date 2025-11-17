@@ -329,8 +329,8 @@ class SolverController:
             for c_idx, cell in enumerate(row):
                 cell_tag = 'th' if c_idx == 0 or r_idx == 0 else 'td'
                 style = ""
-                # Ajustar índices por los headers
-                if r_idx - 1 == pivot_r and c_idx - 1 == pivot_c:
+                
+                if r_idx == pivot_r and c_idx == pivot_c:
                     style = pivot_style
                 cell_content = cell
                 if isinstance(cell, float):
