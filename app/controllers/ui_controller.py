@@ -9,7 +9,7 @@ from flask import (
 )
 from app.controllers.solver_controller import SolverController
 from app.services import StorageService
-# ¡NUESTRAS NUEVAS IMPORTACIONES!
+from app.config import PREFIX_PROBLEMA
 from app.services.pdf_report_service import PdfReportService 
 import os 
 
@@ -241,3 +241,12 @@ def exportar_pdf():
         # --- FIN DE CORRECCIÓN ---
 
 # --- FIN DE CAMBIOS ---
+
+@ui_bp.route("/descargar-problema-json")
+def descargar_problema_json():
+    filepath = StorageService._get_latest_filename(PREFIX_PROBLEMA, extension=".json")
+
+    if not filepath:
+        return "No hay un archivo de problema disponible para descargar.", 404
+
+    return send_file(filepath, as_attachment=True)
