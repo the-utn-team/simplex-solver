@@ -4,18 +4,20 @@ Define un conjunto de rutas relacionadas con la interfaz del usuario.
 """
 
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, 
-    flash, json, jsonify, send_file
+    Blueprint, render_template, request, redirect, 
+    url_for, flash, json, jsonify, session, send_file
 )
+
 from app.controllers.solver_controller import SolverController
 from app.services import StorageService
 from app.config import PREFIX_PROBLEMA
+# Imports de main (PDF) que Git añadió automáticamente
 from app.services.pdf_report_service import PdfReportService 
 import os 
 
 
 ui_bp = Blueprint('ui', __name__)
-storage = StorageService()
+storage = StorageService() # Aún lo usamos para guardar la SOLUCIÓN FINAL
 
 @ui_bp.route('/')
 def index():
@@ -62,9 +64,7 @@ def new_problem():
             "funcion_objetivo": objective,
             "restricciones": restricciones
         }
-
-        storage.save_problem({"problema_definicion": problem_data})
-
+        session['problem_data_wrapper'] = {"problema_definicion": problem_data}
         return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     return render_template("new_problem.html")
@@ -98,7 +98,7 @@ def load_problem():
             flash(msg, "error")
             return redirect(url_for("ui.load_problem"))
 
-        storage.save_problem({"problema_definicion": problem})
+        session['problem_data_wrapper'] = {"problema_definicion": problem}        
         return render_template("preview.html", problem_data=problem, from_page="load")
 
     return render_template("load_problem.html")
@@ -107,6 +107,7 @@ def load_problem():
 def validate_problem_structure(problem: dict) -> tuple[bool, str]:
     """
     Valida que el JSON subido cumpla con la estructura mínima esperada.
+    (Esta función no tenía conflictos)
     """
     if not isinstance(problem, dict):
         return False, "El problema debe ser un objeto JSON."
@@ -158,11 +159,10 @@ def preview_problem():
                 "type": request.form.get("tipo", "maximize"),
                 "coefficients": json.loads(request.form.get("coeficientes", "{}"))
             },
-        "restricciones": json.loads(request.form.get("restricciones", "[]"))
+            "restricciones": json.loads(request.form.get("restricciones", "[]"))
         }
 
-        storage.save_problem({"problema_definicion": problem_data})
-
+        session['problem_data_wrapper'] = {"problema_definicion": problem_data}
         return render_template("preview.html", problem_data=problem_data, from_page="new")
 
     except Exception as e:
@@ -183,13 +183,23 @@ def solve_problem():
     Ejecuta el solver y muestra los resultados.
     """
     try:
-        solver = SolverController()
-        solver.run()  # Internamente carga los JSON guardados
+        
+        # 1. Cargar el problema desde la sesión
+        problem_data_wrapper = session.get('problem_data_wrapper')
+        if not problem_data_wrapper:
+            flash("No se encontró ningún problema en la sesión. Por favor, cargue el problema de nuevo.", "error")
+            return redirect(url_for("ui.new_problem"))
 
-        solution_report = storage.load_solution()
+        # 2. Ejecutar el controlador principal del solver pasándole los datos
+        solver = SolverController(problem_data_wrapper)
+        solution_report = solver.run() # Ahora devuelve el reporte
+
+        # 3. Limpiar la sesión
+        session.pop('problem_data_wrapper', None)
 
         if not solution_report:
-            flash("No se encontró el reporte de solución.", "error")
+            # El propio solver.run() ya habrá impreso el error
+            flash("Ocurrió un error durante la resolución.", "error")
             return redirect(url_for("ui.index"))
 
         return render_template("solution.html", solucion=solution_report)
@@ -197,8 +207,6 @@ def solve_problem():
     except Exception as e:
         flash(f"Error durante la resolución: {e}", "error")
         return redirect(url_for("ui.index"))
-
-# --- INICIO DE CAMBIOS (NUEVA FUNCIONALIDAD) ---
 
 @ui_bp.route('/exportar-pdf', methods=['GET'])
 def exportar_pdf():
@@ -231,16 +239,10 @@ def exportar_pdf():
 
     except FileNotFoundError as e:
         flash(f"Error al cargar el reporte: {e}", "error")
-        # --- INICIO DE CORRECCIÓN (¡EL BUG ESTABA AQUÍ!) ---
         return redirect(url_for("ui.index")) # Redirigir a una ruta GET segura
-        # --- FIN DE CORRECCIÓN ---
     except Exception as e:
         flash(f"Error al generar el PDF: {e}", "error")
-        # --- INICIO DE CORRECCIÓN (¡Y AQUÍ!) ---
         return redirect(url_for("ui.index")) # Redirigir a una ruta GET segura
-        # --- FIN DE CORRECCIÓN ---
-
-# --- FIN DE CAMBIOS ---
 
 @ui_bp.route("/descargar-problema-json")
 def descargar_problema_json():

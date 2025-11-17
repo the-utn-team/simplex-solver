@@ -10,7 +10,10 @@ from scipy.optimize import linprog
 from app.services import StorageService
 import tempfile
 import os
+
 from typing import Tuple, List, Any, Dict 
+import json
+import io
 
 # Plan A
 from gilp import LP, simplex_visual
@@ -27,26 +30,50 @@ from simple_simplex import (
 class SolverController:
     """Controlador para el flujo de cálculo de la solución."""
 
-    def __init__(self):
+    def __init__(self, problem_data_wrapper: dict):
+        """
+        Inicializa el solver con los datos del problema desde la sesión.
+        """
         self.storage = StorageService()
-        self.objective_data = None
-        self.constraints_data = None
-        self.variables = [] 
+        
+        # Los datos se cargan aquí, desde la memoria
+        definition = problem_data_wrapper.get("problema_definicion", {})
+        
+        self.objective_data = definition.get("funcion_objetivo")
+        self.constraints_data = definition.get("restricciones")
+
+        if self.objective_data:
+            self.variables = sorted(list(self.objective_data['coefficients'].keys()))
+        else:
+            self.variables = []
+        
+        print("SolverController inicializado con datos en memoria.")
+
 
     def run(self):
         """
         Ejecuta el flujo principal del cálculo:
+        1. Carga los datos (YA HECHO EN __INIT__)
+        2. Prepara el modelo para Scipy.
+        3. Ejecuta el solver de Scipy.
+        4. Si es factible, genera la visualización (Plan A o B).
+        5. Muestra, guarda y DEVUELVE los resultados.
         """
         print("=== 3. Solución del Problema ===")
+        
+        # Verificamos que los datos se cargaron en __init__
+        if self.objective_data is None or self.constraints_data is None:
+            print("Error: El solver no recibió datos válidos en la inicialización.")
+            return None
+            
         try:
-            if not self._load_data_from_json(): return
             print("Preparando modelo para el solver (Scipy)...")
             c, A_ub, b_ub, A_eq, b_eq, bounds = self._prepare_model_for_scipy(
                 self.objective_data, self.constraints_data, self.variables
             )
             
             print("Ejecutando solver principal (Scipy)...")
-            solver_options = {"presolve": True, "time_limit": 10}
+            solver_options = {"presolve": True, "time_limit": 10} 
             
             result = linprog(
                 c, 
@@ -57,67 +84,40 @@ class SolverController:
                 options=solver_options
             )
 
-            # 2. GENERAR VISUALIZACIÓN
             visualization_html_str = "" 
-            visualization_tableaus_data = [] # Lista vacía por defecto
 
             if result.success:
                 print("Generando visualización (Plan A: gilp)...")
-                # --- INICIO DE CAMBIOS ---
-                # Ahora devuelve (html, data)
-                # ¡¡PERO USAREMOS EL PLAN B PARA LOS DATOS!!
                 
                 # 1. Generamos el HTML (Plan A o B, el que funcione)
                 visualization_html_str, tablas_del_plan_b = self._generate_visualization_html_and_tables()
                 
                 # 2. Guardamos las tablas del Plan B (que sabemos que funcionan)
                 visualization_tableaus_data = tablas_del_plan_b
-                # --- FIN DE CAMBIOS ---
+
             else:
                 print("Problema infactible o no acotado. Omitiendo visualización.")
                 visualization_html_str = "<p>Visualización no disponible (Problema infactible o no acotado).</p>"
+                visualization_tableaus_data = [] # Añadimos esto para que no falle
 
-            # 3. Mostrar y GUARDAR los resultados
-            self._display_and_save_results(result, self.objective_data['type'], visualization_html_str, visualization_tableaus_data)
+            # Ahora capturamos el 'return'
+            final_report = self._display_and_save_results(
+                result, 
+                self.objective_data['type'], 
+                visualization_html_str,
+                visualization_tableaus_data # Pasamos las tablas
+            )
+            return final_report
 
-        except FileNotFoundError as e:
-            print(f"Error al cargar archivos JSON: {e}")
-            print(f"Detalle: {e.args}") 
         except KeyError as e:
             print(f"Error inesperado: No se encontró la llave {e} en los archivos JSON.")
             print("Parece que los archivos JSON no tienen el formato esperado.")
+            return None
         except Exception as e:
             print(f"Ha ocurrido un error inesperado durante el cálculo: {e}")
             import traceback # Importamos traceback
             traceback.print_exc() # Imprimimos el stack trace completo
-
-
-    def _load_data_from_json(self) -> bool:
-        """
-        Carga la definición completa del problema desde el archivo JSON
-        principal que genera el UIController.
-        """
-        print("Cargando datos...")
-        problem_data = StorageService.load_problem() 
-
-        if not problem_data or "problema_definicion" not in problem_data:
-            print("No se encontró el archivo 'problem_definition.json' o no tiene el formato esperado.")
-            return False
-
-        definition = problem_data["problema_definicion"]
-        
-        self.objective_data = definition.get("funcion_objetivo")
-        self.constraints_data = definition.get("restricciones")
-
-        if not self.objective_data or not self.constraints_data:
-            print("No se encontraron datos de la función objetivo o de las restricciones en el JSON.")
-            return False
-            
-        self.variables = sorted(list(self.objective_data['coefficients'].keys()))
-        
-        print(f"Datos cargados. Variables del modelo: {self.variables}")
-        return True
-
+            return None
 
     def _prepare_model_for_scipy(self, objective_data: dict, constraints_data: list, variables: list):
         """
@@ -154,6 +154,9 @@ class SolverController:
             elif operator == '=':
                 A_eq.append(A_row)
                 b_eq.append(rhs_value)
+                # Y también la convertimos para A_ub
+                A_ub.append(A_row)
+                b_ub.append(rhs_value)
                 A_ub.append([-x for x in A_row])
                 b_ub.append(-rhs_value)
 
@@ -166,30 +169,24 @@ class SolverController:
 
         return np.array(c), A_ub_np, b_ub_np, A_eq_np, b_eq_np, bounds
 
-    # --- INICIO DE CAMBIOS (FUNCIÓN RENOMBRADA) ---
     def _generate_visualization_html_and_tables(self) -> Tuple[str, List[Dict[str, Any]]]:
-    # --- FIN DE CAMBIOS ---
         """
         Estrategia híbrida:
         1. (Plan B) Ejecuta simple_simplex para OBTENER LOS DATOS DE LAS TABLAS.
-        2. (Plan A) Intenta usar 'gilp' para la visualización HTML interactiva.
+        2. (Plan A) Intenta usar 'gilp' para la visualización HTML interactiva (con io.StringIO).
         3. Si 'gilp' falla, usa los datos del Plan B para generar un HTML estático.
         
         Retorna: (html_string, lista_de_tablas_extraidas)
         """
         
-        # --- INICIO DE CAMBIOS: EJECUTAMOS EL PLAN B PRIMERO ---
+        # --- (PASO 1: EJECUTAMOS EL PLAN B PRIMERO) ---
         print("Ejecutando Plan B (simple_simplex) para extraer tablas...")
         plan_b_html = ""
         plan_b_tableaus = []
         try:
-            # 1. Ejecutar simple_simplex
             resultado_json_plan_b = self._run_simple_simplex()
-            
-            # 2. Extraer las tablas (¡esto es lo que queremos para el PDF!)
             plan_b_tableaus = self._extract_tableaus_from_simple_simplex(resultado_json_plan_b)
             
-            # 3. Generar el HTML de respaldo (Plan B)
             html_output = []
             for table_data in plan_b_tableaus:
                 title = table_data.get("title", "Tabla")
@@ -206,10 +203,8 @@ class SolverController:
         except Exception as e_plan_b:
             print(f"Error crítico en Plan B (simple_simplex): {e_plan_b}")
             plan_b_html = f"<p>Error en Plan B: {e_plan_b}</p>"
-            # plan_b_tableaus se queda como []
-        # --- FIN DE CAMBIOS ---
-
-
+        
+        # --- (PASO 2: EL PLAN A PARA EL HTML ) ---
         try:
             # Ahora intentamos el Plan A (gilp) solo para el HTML
             c_gilp = []
@@ -243,80 +238,26 @@ class SolverController:
             lp = LP(A=A_gilp, b=b_gilp, c=c_gilp)
             visual = simplex_visual(lp=lp)
             
-            # --- INICIO DE CAMBIOS ---
-            # Ya no intentamos extraer de gilp, usamos Plan B
-            # extracted_tableaus = self._extract_tableaus_from_gilp(lp) 
-            # --- FIN DE CAMBIOS ---
+            f = io.StringIO()
+            visual.write_html(f, include_mathjax=False, include_plotlyjs=True)
+            html_content = f.getvalue()
+            f.close()
             
-            with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.html', encoding='utf-8') as f:
-                temp_filename = f.name
-                visual.write_html(temp_filename, include_mathjax=False, include_plotlyjs=True)
-            with open(temp_filename, 'r', encoding='utf-8') as f:
-                html_content = f.read()
-            os.remove(temp_filename)
-            
-            print("Visualización gilp (Plan A) generada correctamente.")
-            # --- INICIO DE CAMBIOS ---
+            print("Visualización gilp (Plan A) generada (en memoria).")
             # Devolvemos el HTML de gilp (Plan A)
             # Pero los DATOS de simple_simplex (Plan B)
             return html_content, plan_b_tableaus
-            # --- FIN DE CAMBIOS ---
 
         except Exception as e_plan_a:
             # --- Plan A falló ---
             print(f"Error en 'gilp' (Plan A): {e_plan_a}. Usando HTML de Plan B.")
-            # --- INICIO DE CAMBIOS ---
             # Devolvemos el HTML y los datos del Plan B
             return plan_b_html, plan_b_tableaus
-            # --- FIN DE CAMBIOS ---
-
-
-    def _extract_tableaus_from_gilp(self, lp: LP) -> List[Dict[str, Any]]:
-        """
-        Extrae la historia de tablas (tableaus) del objeto LP de gilp
-        y la convierte a un formato simple (listas) para el JSON/PDF.
-        """
-        extracted_data = []
-        # --- INICIO DE CAMBIOS ---
-        # El log dice que 'lp' no tiene 'tableaus', así que esta función
-        # probablemente siempre devuelva [], pero la dejamos por si acaso.
-        if not hasattr(lp, 'tableaus') or not lp.tableaus:
-            print("Advertencia: El objeto 'lp' de gilp no tiene atributo 'tableaus' o está vacío.")
-            return extracted_data 
-        # --- FIN DE CAMBIOS ---
-
-        for i, tableau in enumerate(lp.tableaus):
-            try:
-                tableau_array = tableau.to_array()
-                tableau_list = np.round(tableau_array, 4).tolist()
-                headers = list(tableau.col_labels)
-                row_headers = list(tableau.row_labels)
-                final_table_list = [["Base"] + headers] 
-                for j, row_label in enumerate(row_headers):
-                    final_table_list.append([row_label] + tableau_list[j])
-                pivot = None
-                pivot_coords_str = "N/A"
-                if i < len(lp.pivots):
-                    pivot_coords = lp.pivots[i] 
-                    pivot_coords_str = f"({pivot_coords[0]}, {pivot_coords[1]})"
-                    if pivot_coords[0] in row_headers and pivot_coords[1] in headers:
-                        pivot_row_index = row_headers.index(pivot_coords[0])
-                        pivot_col_index = headers.index(pivot_coords[1])
-                        pivot = (pivot_row_index, pivot_col_index) 
-                extracted_data.append({
-                    "iteration": i,
-                    "title": f"Iteración {i} (Pivote: {pivot_coords_str})",
-                    "table": final_table_list,
-                    "pivot": pivot 
-                })
-            except Exception as e:
-                print(f"Error al procesar la tabla {i} de gilp: {e}")
-        return extracted_data
 
     def _tableau_to_html(self, tableau_list: list, pivot_r: int, pivot_c: int) -> str:
         """
         Convierte una lista de listas en una tabla HTML.
-        Resalta la celda pivote (pivot_r, pivot_c) en rojo.
+        (Usamos la versión de 'main' (HEAD) que es más detallada)
         """
         if pivot_r is None: pivot_r = -1
         if pivot_c is None: pivot_c = -1
@@ -324,23 +265,28 @@ class SolverController:
         html = [
             '<table class="table table-bordered table-striped" style="border:1px solid #ccc; justify-content:center; float:none; margin-left:auto; margin-right:auto;">'
         ]
+        
         for r_idx, row in enumerate(tableau_list):
             html.append('<tr>')
             for c_idx, cell in enumerate(row):
                 cell_tag = 'th' if c_idx == 0 or r_idx == 0 else 'td'
                 style = ""
                 
-                if r_idx == pivot_r and c_idx == pivot_c:
+                
+                if r_idx == (pivot_r + 1) and c_idx == (pivot_c + 1): # +1 para saltar headers
                     style = pivot_style
+                
+                # Lógica de para formato
                 cell_content = cell
                 if isinstance(cell, float):
                     cell_content = f"{cell:.4f}"
                 html.append(f'<{cell_tag} {style}>{cell_content}</{cell_tag}>')
             html.append('</tr>')
+            
         html.append('</table>')
         return "".join(html)
 
-    # --- INICIO DE CAMBIOS (FUNCIÓN SEPARADA) ---
+
     def _run_simple_simplex(self) -> dict:
         """
         Ejecuta el solver 'simple_simplex' y devuelve el JSON de resultados.
@@ -369,16 +315,15 @@ class SolverController:
         objective_string = f"{obj_coeffs_str},{obj_type_str}"
         add_objective(tableau, objective_string)
 
-        # 4. Resolver y capturar el JSON COMPLETO
         resultado_json = optimize_json_format(tableau, maximize=is_maximize)
         return resultado_json
-    # --- FIN DE CAMBIOS ---
 
 
     def _extract_tableaus_from_simple_simplex(self, simplex_json: dict) -> List[Dict[str, Any]]:
         """
         Extrae la historia de tablas (pivotSteps) del JSON de 'simple_simplex'
         y la convierte a un formato simple (listas) para el JSON/PDF.
+        (Esta es la lógica de 'main')
         """
         extracted_data = []
         if "pivotSteps" not in simplex_json:
@@ -395,8 +340,7 @@ class SolverController:
 
             num_cols = len(tableau_data[0])
             
-            # Crear Headers (Base, C1, C2, ... C(n))
-            # Esta es nuestra mejor suposición de los headers de simple_simplex
+            # Crear Headers
             headers = ["Base"] + [f"C{i}" for i in range(num_cols)]
             
             title = ""
@@ -418,8 +362,12 @@ class SolverController:
             })
         return extracted_data
 
+
     def _display_and_save_results(self, result, objective_type: str, gilp_html_output: str, gilp_tableaus: list):
-        """Muestra la solución de forma amigable y guarda el reporte completo."""
+        """
+        Muestra la solución de forma amigable, guarda el reporte completo y DEVUELVE el reporte.
+        (Fusión de ambas lógicas)
+        """
         
         print("----------------------------------")
         print("         SOLUCIÓN ÓPTIMA          ")
@@ -432,7 +380,7 @@ class SolverController:
         solution_found = {}
 
         if result.success:
-            print("¡Se encontró una solución factible! ✅\n")
+            print("¡Se encontró una solución factible! \n")
             print("Valores de las variables:")
             
             solution_vars = {}
@@ -454,7 +402,7 @@ class SolverController:
             
         else:
             status_message = "Sin Solucion Factible" if result.status == 2 else "Error"
-            print(f"{status_message} ❌")
+            print(f"{status_message} ")
             if result.status != 2:
                 print(f"(Estado: {result.message})")
 
@@ -470,11 +418,15 @@ class SolverController:
             "problema_definicion": problem_definition,
             "solucion_encontrada": solution_found,
             "visualizacion_gilp_html": gilp_html_output,
-            "tablas_intermedias": gilp_tableaus # ¡Guardamos las tablas!
+            "tablas_intermedias": gilp_tableaus 
         }
         
         try:
+            # Usamos el método estático como en 'main'
             filename = StorageService.save_solution(final_report)
             print(f"\nReporte de solución guardado en: {filename}")
         except Exception as e:
             print(f"\nAdvertencia: No se pudo guardar el reporte de solución: {e}")
+        
+        # Devolvemos el reporte para que la UI lo use
+        return final_report

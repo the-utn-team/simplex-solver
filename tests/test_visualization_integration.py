@@ -1,3 +1,5 @@
+# tests/test_visualization_integration.py (CORREGIDO)
+
 import pytest
 import numpy as np
 from flask import url_for
@@ -80,13 +82,7 @@ RESULTADO_MIN_SIMPLE = OptimizeResult({
 def test_flujo_completo_visualizacion_maximizacion(client, mocker, tmpdir):
     """
     Test de integración completo: desde el formulario hasta la visualización.
-    Verifica que las tablas de gilp se generen y muestren correctamente.
-    
-    Flujo:
-    1. Usuario ingresa un problema (POST /new)
-    2. Sistema muestra preview
-    3. Usuario resuelve el problema (POST /solve)
-    4. Sistema muestra solución CON visualización de gilp
+    (Este test usa 'client', por lo que YA FUNCIONABA, no necesita cambios)
     """
     # Setup: Directorio temporal para outputs
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
@@ -95,7 +91,7 @@ def test_flujo_completo_visualizacion_maximizacion(client, mocker, tmpdir):
     form_data = {
         'problem_type': 'maximize',
         'objective[]': [3.0, 5.0],
-        'constraint_1[]': [1.0, 3.0, 3.0],  # Coeficientes de x1 para cada restricción
+        'constraint_1[]': [1.0, 0.0, 3.0],  # Coeficientes de x1 para cada restricción
         'constraint_2[]': [0.0, 2.0, 2.0],  # Coeficientes de x2 para cada restricción
         'constraint_sign[]': ['<=', '<=', '<='],
         'constraint_rhs[]': [4.0, 12.0, 18.0]
@@ -139,30 +135,18 @@ def test_flujo_completo_visualizacion_maximizacion(client, mocker, tmpdir):
 def test_tablas_simplex_coinciden_con_calculos_internos(mocker, tmpdir):
     """
     Test que verifica que las tablas mostradas coinciden con los cálculos.
-    
-    Estrategia:
-    1. Ejecutar el solver manualmente (sin Flask)
-    2. Capturar el HTML generado por gilp
-    3. Parsear el contenido y verificar que se generó correctamente
-    4. Verificar valores específicos de la solución
+
     """
     # Setup
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
-    
-    # Guardar problema de prueba
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": PROBLEMA_MAX_SIMPLE})
-    
+
     # Mock del linprog para tener control total
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=RESULTADO_MAX_SIMPLE)
+    # Ejecutar solver (pasando datos al constructor)
+    solver = SolverController({"problema_definicion": PROBLEMA_MAX_SIMPLE})
+    solution = solver.run() # Capturamos el return
     
-    # Ejecutar solver
-    solver = SolverController()
-    solver.run()
-    
-    # Cargar el reporte generado
-    solution = storage.load_solution()
     assert solution is not None
     
     # Verificar estructura del reporte
@@ -174,33 +158,22 @@ def test_tablas_simplex_coinciden_con_calculos_internos(mocker, tmpdir):
     html = solution['visualizacion_gilp_html']
     soup = BeautifulSoup(html, 'html.parser')
     
-    # Verificar que hay contenido
     assert len(html) > 100, "El HTML de gilp está vacío o muy corto"
     
-    # Gilp genera visualizaciones con Plotly (gráficos interactivos)
-    # No necesariamente tablas HTML tradicionales
-    # Buscar evidencia de contenido de gilp
     tiene_plotly = 'plotly' in html.lower() or 'Plotly' in html
     tiene_divs = len(soup.find_all('div')) > 0
     
     assert tiene_plotly or tiene_divs, "No se encontró contenido de visualización de gilp"
     
-    # Verificar que las variables del problema están en el HTML
-    # (pueden estar en etiquetas, atributos o datos de plotly)
     assert 'x1' in html or 'x_1' in html or 'x[1]' in html, "Variable x1 no aparece"
     assert 'x2' in html or 'x_2' in html or 'x[2]' in html, "Variable x2 no aparece"
     
-    # Verificar que la solución es correcta
     assert solution['solucion_encontrada']['valores_variables']['x1'] == 2.0
     assert solution['solucion_encontrada']['valores_variables']['x2'] == 6.0
     assert solution['solucion_encontrada']['valor_optimo_z'] == 36.0
 
 
 def test_visualizacion_problema_minimizacion(client, mocker, tmpdir):
-    """
-    Verifica que la visualización funciona correctamente para problemas
-    de minimización (donde se debe negar la función objetivo).
-    """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     # Enviar problema de minimización
@@ -222,20 +195,14 @@ def test_visualizacion_problema_minimizacion(client, mocker, tmpdir):
     response = client.post('/solve', follow_redirects=True)
     html = response.data.decode('utf-8')
     
-    # Verificar que muestra minimización
     assert '14.0000' in html or '14.00' in html
     
-    # Verificar que hay visualización
     soup = BeautifulSoup(html, 'html.parser')
     gilp_container = soup.find('div', class_='gilp-container')
     assert gilp_container is not None
 
 
 def test_visualizacion_con_restricciones_igualdad(mocker, tmpdir):
-    """
-    Verifica que gilp maneja correctamente las restricciones de igualdad.
-    Estas se convierten en dos restricciones (<= y >=) internamente.
-    """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     problema_con_igualdad = {
@@ -248,10 +215,6 @@ def test_visualizacion_con_restricciones_igualdad(mocker, tmpdir):
             {"coefficients": {"x1": 2.0, "x2": 1.0}, "operator": "<=", "rhs": 15.0}
         ]
     }
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": problema_con_igualdad})
-    
     # Mock de resultado
     mock_result = OptimizeResult({
         'fun': -10.0,
@@ -263,26 +226,18 @@ def test_visualizacion_con_restricciones_igualdad(mocker, tmpdir):
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=mock_result)
     
-    # Ejecutar solver
-    solver = SolverController()
-    solver.run()
+    solver = SolverController({"problema_definicion": problema_con_igualdad})
+    solution = solver.run()
     
     # Verificar que se generó visualización sin errores
-    solution = storage.load_solution()
     html = solution['visualizacion_gilp_html']
     
-
-    # Verificar que NO hay un mensaje de error explícito del sistema
     assert 'Error al generar la visualización' not in html
-    assert 'error' not in html.lower()[:500]  # Solo revisar el inicio (no el código JS)
+    assert 'error' not in html.lower()[:500]
     assert len(html) > 100
 
 
 def test_visualizacion_problema_infactible(mocker, tmpdir):
-    """
-    Verifica que cuando el problema es infactible, la visualización
-    aún se genera (o se muestra un mensaje apropiado).
-    """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     # Problema infactible: x1 <= 5 y x1 >= 10
@@ -296,10 +251,7 @@ def test_visualizacion_problema_infactible(mocker, tmpdir):
             {"coefficients": {"x1": 1.0}, "operator": ">=", "rhs": 10.0}
         ]
     }
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": problema_infactible})
-    
+
     # Mock de resultado infactible
     mock_result = OptimizeResult({
         'success': False,
@@ -310,10 +262,8 @@ def test_visualizacion_problema_infactible(mocker, tmpdir):
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=mock_result)
     
-    solver = SolverController()
-    solver.run()
-    
-    solution = storage.load_solution()
+    solver = SolverController({"problema_definicion": problema_infactible})
+    solution = solver.run()
     
     # Verificar que el status es correcto
     assert solution['solucion_encontrada']['status'] == 'Sin Solucion Factible'
@@ -329,21 +279,16 @@ def test_visualizacion_problema_infactible(mocker, tmpdir):
 
 def test_verificar_estructura_html_visualizacion(mocker, tmpdir):
     """
-    Test estructural: verifica que el HTML generado tiene la estructura
-    esperada para ser renderizado correctamente en solution.html
+    --- CORREGIDO PARA SOLUCIÓN B ---
     """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": PROBLEMA_MAX_SIMPLE})
-    
+
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=RESULTADO_MAX_SIMPLE)
     
-    solver = SolverController()
-    solver.run()
+    solver = SolverController({"problema_definicion": PROBLEMA_MAX_SIMPLE})
+    solution = solver.run()
     
-    solution = storage.load_solution()
     html = solution['visualizacion_gilp_html']
     
     # Verificar que es HTML válido
@@ -359,8 +304,7 @@ def test_verificar_estructura_html_visualizacion(mocker, tmpdir):
 
 def test_integracion_css_con_visualizacion(client, mocker, tmpdir):
     """
-    Verifica que los estilos CSS (.gilp-container) se aplican correctamente
-    al contenido de la visualización.
+    (Este test usa 'client', por lo que YA FUNCIONABA, no necesita cambios)
     """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
@@ -368,8 +312,8 @@ def test_integracion_css_con_visualizacion(client, mocker, tmpdir):
     form_data = {
         'problem_type': 'maximize',
         'objective[]': [3.0, 5.0],
-        'constraint_1[]': [1.0, 3.0, 3.0],
-        'constraint_2[]': [0.0, 2.0, 2.0],
+        'constraint_1[]': [1.0, 0.0, 3.0], # Corregido
+        'constraint_2[]': [0.0, 2.0, 2.0], # Corregido
         'constraint_sign[]': ['<=', '<=', '<='],
         'constraint_rhs[]': [4.0, 12.0, 18.0]
     }
@@ -400,10 +344,6 @@ def test_integracion_css_con_visualizacion(client, mocker, tmpdir):
 # =============================================================================
 
 def test_regresion_problema_sin_restricciones(mocker, tmpdir):
-    """
-    Test de regresión: verifica que el sistema maneja correctamente
-    un problema sin restricciones (o solo con no-negatividad).
-    """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     problema_sin_restricciones = {
@@ -413,10 +353,7 @@ def test_regresion_problema_sin_restricciones(mocker, tmpdir):
         },
         "restricciones": []  # Sin restricciones
     }
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": problema_sin_restricciones})
-    
+
     # Mock de resultado
     mock_result = OptimizeResult({
         'success': False,
@@ -427,22 +364,16 @@ def test_regresion_problema_sin_restricciones(mocker, tmpdir):
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=mock_result)
     
-    solver = SolverController()
-    solver.run()  # No debe fallar
+    solver = SolverController({"problema_definicion": problema_sin_restricciones})
+    solution = solver.run()  # No debe fallar
     
-    solution = storage.load_solution()
     assert solution is not None
     
-    # CORRECCIÓN: El problema real es que load_solution intenta cargar
-    # pero el problema no se guardó correctamente (sin restricciones)
-    # Verificamos que al menos se ejecutó sin crash
     assert 'solucion_encontrada' in solution
 
 
 def test_regresion_coeficientes_cero(mocker, tmpdir):
-    """
-    Verifica que se manejan correctamente los coeficientes en cero.
-    """
+
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     problema_con_ceros = {
@@ -456,9 +387,6 @@ def test_regresion_coeficientes_cero(mocker, tmpdir):
         ]
     }
     
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": problema_con_ceros})
-    
     mock_result = OptimizeResult({
         'fun': -25.0,
         'success': True,
@@ -469,10 +397,9 @@ def test_regresion_coeficientes_cero(mocker, tmpdir):
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=mock_result)
     
-    solver = SolverController()
-    solver.run()
+    solver = SolverController({"problema_definicion": problema_con_ceros})
+    solution = solver.run()
     
-    solution = storage.load_solution()
     html = solution['visualizacion_gilp_html']
     
     # Verificar que se generó algo
@@ -488,13 +415,7 @@ def test_regresion_coeficientes_cero(mocker, tmpdir):
 # =============================================================================
 
 def test_performance_visualizacion_problema_grande(mocker, tmpdir):
-    """
-    Verifica que la visualización no falla con problemas más grandes
-    (más variables y restricciones).
-    
-    NOTA: Este test solo verifica 3 variables porque gilp
-    solo soporta visualización 2D/3D
-    """
+
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
     
     # Crear un problema con 3 variables y 5 restricciones
@@ -521,10 +442,7 @@ def test_performance_visualizacion_problema_grande(mocker, tmpdir):
             }
         ]
     }
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": problema_grande})
-    
+
     # Mock de resultado
     mock_result = OptimizeResult({
         'fun': -30.0,
@@ -536,11 +454,9 @@ def test_performance_visualizacion_problema_grande(mocker, tmpdir):
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=mock_result)
     
-    # Ejecutar y medir que no falle (timeout implícito de pytest)
-    solver = SolverController()
-    solver.run()
+    solver = SolverController({"problema_definicion": problema_grande})
+    solution = solver.run()
     
-    solution = storage.load_solution()
     assert solution is not None
     assert 'visualizacion_gilp_html' in solution
 
@@ -550,22 +466,13 @@ def test_performance_visualizacion_problema_grande(mocker, tmpdir):
 # =============================================================================
 
 def test_solucion_contiene_datos_problema_original(mocker, tmpdir):
-    """
-    Verifica que el reporte de solución incluye la definición
-    completa del problema original.
-    """
     mocker.patch('app.config.OUTPUT_DIR', str(tmpdir))
-    
-    storage = StorageService()
-    storage.save_problem({"problema_definicion": PROBLEMA_MAX_SIMPLE})
     
     mocker.patch('app.controllers.solver_controller.linprog',
                  return_value=RESULTADO_MAX_SIMPLE)
     
-    solver = SolverController()
-    solver.run()
-    
-    solution = storage.load_solution()
+    solver = SolverController({"problema_definicion": PROBLEMA_MAX_SIMPLE})
+    solution = solver.run()
     
     # Verificar que contiene la definición original
     assert solution['problema_definicion'] == PROBLEMA_MAX_SIMPLE
@@ -576,4 +483,3 @@ def test_solucion_contiene_datos_problema_original(mocker, tmpdir):
     # Verificar que contiene la visualización
     assert 'visualizacion_gilp_html' in solution
     assert len(solution['visualizacion_gilp_html']) > 0
-    
