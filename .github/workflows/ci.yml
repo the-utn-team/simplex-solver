@@ -1,7 +1,6 @@
 # Nombre de tu "flujo de trabajo" (aparecerá en la pestaña Actions de GitHub)
 name: Pruebas de Python (CI)
 
-# Cuándo quieres que se ejecute
 on:
   # Ejecútalo en cada 'push' a la rama 'main'
   push:
@@ -10,7 +9,6 @@ on:
   pull_request:
     branches: [ main ]
 
-# Qué trabajos (jobs) debe realizar
 jobs:
   # Nombramos un trabajo, "build-and-test" 
   build-and-test:
@@ -26,14 +24,14 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.12' 
+        python-version: '3.11' 
 
     # 3. Instala las dependencias desde tu requirements.txt
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-
+    
     # 4. Ejecuta tus tests con pytest
     - name: Run tests
       run: |
