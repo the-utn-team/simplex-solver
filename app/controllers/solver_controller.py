@@ -237,8 +237,6 @@ class SolverController:
         pivot_style = 'style="background-color:#fff0f0; color:#d00; font-weight:bold;"'
         
         html = [
-            # Usamos las clases de Bootstrap/Pandas para que se vea bien con el CSS
-            # Y centramos la tabla
             '<table class="table table-bordered table-striped" style="border:1px solid #ccc; justify-content:center; float:none; margin-left:auto; margin-right:auto;">'
         ]
         
@@ -260,7 +258,7 @@ class SolverController:
             
             for c_idx, cell in enumerate(row):
                 style = ""
-                # ¡AQUÍ ESTÁ LA MAGIA!
+                
                 if r_idx == pivot_r and c_idx == pivot_c:
                     style = pivot_style
                 
