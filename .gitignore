@@ -39,3 +39,5 @@ instance/
 # Archivos JSON generados
 *.json
 
+#PDF
+.*.pdf
