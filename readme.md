@@ -81,6 +81,6 @@ docker-compose down
 
 ## Documentación Completa
 Para información detallada consulte los documentos en /docs
-- [Documentación técnica]([https://github.com/the-utn-team/simplex-solver/blob/main/docs/technical_documentation.md]) 
-- [Manual de usuario]([https://github.com/the-utn-team/simplex-solver/blob/main/docs/user_manual.md]) 
-- [Guía de pruebas]([https://github.com/the-utn-team/simplex-solver/blob/main/docs/testing_guide.md]) 
+- [Documentación técnica](https://github.com/the-utn-team/simplex-solver/blob/main/docs/technical_documentation.md) 
+- [Guía del usuario](https://github.com/the-utn-team/simplex-solver/blob/main/docs/user_manual.md) 
+- [Guía de pruebas](https://github.com/the-utn-team/simplex-solver/blob/main/docs/testing_guide.md) 
